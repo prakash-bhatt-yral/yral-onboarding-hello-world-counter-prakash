@@ -5,8 +5,14 @@ license.workspace = true
 version.workspace = true
 
 [dependencies]
-anyhow.workspace = true
 reqwest.workspace = true
+serde.workspace = true
+thiserror.workspace = true
 types = { path = "../types" }
 url.workspace = true
 
+[dev-dependencies]
+axum.workspace = true
+http.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
