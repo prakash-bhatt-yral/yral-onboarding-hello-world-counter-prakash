@@ -83,7 +83,7 @@
 - Create: `README.md`
 - Create: each crate directory with minimal `Cargo.toml` and `src/lib.rs` or `src/main.rs`
 
-- [ ] **Step 1: Create the workspace manifest and shared dependency versions**
+- [x] **Step 1: Create the workspace manifest and shared dependency versions**
 
 Use a workspace root like:
 
@@ -105,7 +105,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 ```
 
-- [ ] **Step 2: Create minimal crate manifests and placeholder sources**
+- [x] **Step 2: Create minimal crate manifests and placeholder sources**
 
 Each crate should compile with either:
 
@@ -121,12 +121,12 @@ fn main() {
 }
 ```
 
-- [ ] **Step 3: Verify the empty workspace compiles**
+- [x] **Step 3: Verify the empty workspace compiles**
 
 Run: `cargo check`
 Expected: workspace compiles with no missing members or manifest errors
 
-- [ ] **Step 4: Commit the scaffold**
+- [x] **Step 4: Commit the scaffold**
 
 ```bash
 git add Cargo.toml rust-toolchain.toml rustfmt.toml clippy.toml .gitignore README.md crates
@@ -144,7 +144,7 @@ git commit -m "build: scaffold workspace crates"
 - Test: `crates/types/src/hello.rs`
 - Test: `crates/types/src/health.rs`
 
-- [ ] **Step 1: Write failing contract tests in the `types` crate**
+- [x] **Step 1: Write failing contract tests in the `types` crate**
 
 Add tests for JSON-stable models such as:
 
@@ -167,12 +167,12 @@ Test cases:
 - `HelloResponse` round-trips `visitor_count: Some(3)`
 - `HealthResponse` round-trips as JSON
 
-- [ ] **Step 2: Run the failing crate tests**
+- [x] **Step 2: Run the failing crate tests**
 
 Run: `cargo test -p types`
 Expected: FAIL because the types and derives are not implemented yet
 
-- [ ] **Step 3: Implement the shared types**
+- [x] **Step 3: Implement the shared types**
 
 Expose modules from `src/lib.rs`:
 
@@ -184,12 +184,12 @@ pub use health::HealthResponse;
 pub use hello::HelloResponse;
 ```
 
-- [ ] **Step 4: Re-run the `types` tests**
+- [x] **Step 4: Re-run the `types` tests**
 
 Run: `cargo test -p types`
 Expected: PASS with the contract tests green
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add crates/types
@@ -205,7 +205,7 @@ git commit -m "feat: add shared response contract types"
 - Create: `crates/domain/src/greeting.rs`
 - Test: `crates/domain/src/greeting.rs`
 
-- [ ] **Step 1: Write failing domain tests for greeting behavior**
+- [x] **Step 1: Write failing domain tests for greeting behavior**
 
 Model the business concepts independently of HTTP:
 
@@ -223,12 +223,12 @@ Test cases:
 - numbered greeting renders `"Hello visitor. You are the 7'th visitor to this page"`
 - zero is rejected if you decide visitor counts must start at `1`
 
-- [ ] **Step 2: Run the failing domain tests**
+- [x] **Step 2: Run the failing domain tests**
 
 Run: `cargo test -p domain greeting`
 Expected: FAIL because the domain model does not exist yet
 
-- [ ] **Step 3: Implement the smallest domain model that satisfies the tests**
+- [x] **Step 3: Implement the smallest domain model that satisfies the tests**
 
 Prefer:
 
@@ -240,12 +240,12 @@ impl Greeting {
 
 Keep domain free of Axum, Serde, env parsing, and storage details.
 
-- [ ] **Step 4: Re-run the domain tests**
+- [x] **Step 4: Re-run the domain tests**
 
 Run: `cargo test -p domain greeting`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add crates/domain
@@ -263,7 +263,7 @@ git commit -m "feat: add domain greeting rules"
 - Create: `crates/application/src/service.rs`
 - Test: `crates/application/src/service.rs`
 
-- [ ] **Step 1: Write failing application tests against fake ports**
+- [x] **Step 1: Write failing application tests against fake ports**
 
 Define the application boundary around a store port and runtime mode:
 
@@ -286,12 +286,12 @@ Write tests for:
 - counter mode calls the port and returns a numbered response
 - health uses `"memory"` or `"postgres"` based on adapter-reported storage name
 
-- [ ] **Step 2: Run the failing application tests**
+- [x] **Step 2: Run the failing application tests**
 
 Run: `cargo test -p application`
 Expected: FAIL because ports and service are not implemented
 
-- [ ] **Step 3: Implement the application service**
+- [x] **Step 3: Implement the application service**
 
 Shape:
 
@@ -309,12 +309,12 @@ impl HelloWorldService {
 
 Keep all HTTP mapping and env parsing out of this crate.
 
-- [ ] **Step 4: Re-run the application tests**
+- [x] **Step 4: Re-run the application tests**
 
 Run: `cargo test -p application`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add crates/application
@@ -329,7 +329,7 @@ git commit -m "feat: add application service and ports"
 - Create: `crates/adapter-counter-store-memory/src/lib.rs`
 - Test: `crates/adapter-counter-store-memory/src/lib.rs`
 
-- [ ] **Step 1: Write failing adapter tests**
+- [x] **Step 1: Write failing adapter tests**
 
 Test for:
 - first `next_visitor_count()` returns `1`
@@ -337,12 +337,12 @@ Test for:
 - `health()` returns `Ok(())`
 - adapter reports its storage name as `"memory"`
 
-- [ ] **Step 2: Run the failing adapter tests**
+- [x] **Step 2: Run the failing adapter tests**
 
 Run: `cargo test -p adapter-counter-store-memory`
 Expected: FAIL
 
-- [ ] **Step 3: Implement the in-memory adapter**
+- [x] **Step 3: Implement the in-memory adapter**
 
 Use a simple async-safe counter:
 
@@ -355,12 +355,12 @@ pub struct MemoryCounterStore {
 
 Implement the application `CounterStore` trait in this crate only.
 
-- [ ] **Step 4: Re-run the adapter tests**
+- [x] **Step 4: Re-run the adapter tests**
 
 Run: `cargo test -p adapter-counter-store-memory`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add crates/adapter-counter-store-memory
@@ -376,7 +376,7 @@ git commit -m "feat: add memory counter store adapter"
 - Create: `crates/adapter-observability-tracing/src/lib.rs`
 - Test: `crates/adapter-config-env/src/lib.rs`
 
-- [ ] **Step 1: Write failing config tests**
+- [x] **Step 1: Write failing config tests**
 
 Parse runtime values such as:
 - `APP_HOST`
@@ -386,12 +386,12 @@ Parse runtime values such as:
 
 Test invalid-mode rejection and default values.
 
-- [ ] **Step 2: Run the failing config tests**
+- [x] **Step 2: Run the failing config tests**
 
 Run: `cargo test -p adapter-config-env`
 Expected: FAIL
 
-- [ ] **Step 3: Implement config and tracing bootstrap**
+- [x] **Step 3: Implement config and tracing bootstrap**
 
 Suggested shapes:
 
@@ -407,12 +407,12 @@ pub fn init_tracing() { ... }
 
 Keep env parsing isolated from the binary and application crates.
 
-- [ ] **Step 4: Re-run the adapter tests**
+- [x] **Step 4: Re-run the adapter tests**
 
 Run: `cargo test -p adapter-config-env`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add crates/adapter-config-env crates/adapter-observability-tracing
@@ -430,19 +430,19 @@ git commit -m "feat: add config and tracing adapters"
 - Create: `crates/adapter-http-axum/src/handlers.rs`
 - Test: `crates/adapter-http-axum/src/handlers.rs`
 
-- [ ] **Step 1: Write failing handler tests**
+- [x] **Step 1: Write failing handler tests**
 
 Test:
 - `GET /` returns `StatusCode::OK` and a `HelloResponse`
 - `GET /health` returns `StatusCode::OK` and a `HealthResponse`
 - application errors map to `500` or `503` consistently
 
-- [ ] **Step 2: Run the failing HTTP adapter tests**
+- [x] **Step 2: Run the failing HTTP adapter tests**
 
 Run: `cargo test -p adapter-http-axum`
 Expected: FAIL
 
-- [ ] **Step 3: Implement the router and handlers**
+- [x] **Step 3: Implement the router and handlers**
 
 Keep the public entrypoint small:
 
@@ -457,12 +457,12 @@ pub fn build_router(service: Arc<HelloWorldService>) -> Router {
 
 No storage selection or env parsing in this crate.
 
-- [ ] **Step 4: Re-run the HTTP adapter tests**
+- [x] **Step 4: Re-run the HTTP adapter tests**
 
 Run: `cargo test -p adapter-http-axum`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add crates/adapter-http-axum
@@ -478,19 +478,19 @@ git commit -m "feat: add axum http adapter"
 - Create: `crates/client-rust/src/error.rs`
 - Test: `crates/client-rust/src/lib.rs`
 
-- [ ] **Step 1: Write failing client tests**
+- [x] **Step 1: Write failing client tests**
 
 Cover:
 - client builds from a base URL
 - request paths are normalized (`/` and `/health`)
 - error type preserves HTTP status for callers
 
-- [ ] **Step 2: Run the failing client tests**
+- [x] **Step 2: Run the failing client tests**
 
 Run: `cargo test -p client-rust`
 Expected: FAIL
 
-- [ ] **Step 3: Implement the typed client**
+- [x] **Step 3: Implement the typed client**
 
 Suggested surface:
 
@@ -504,12 +504,12 @@ impl HelloWorldClient {
 }
 ```
 
-- [ ] **Step 4: Re-run the client tests**
+- [x] **Step 4: Re-run the client tests**
 
 Run: `cargo test -p client-rust`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add crates/client-rust
@@ -525,7 +525,7 @@ git commit -m "feat: add rust client crate"
 - Create: `crates/bin-server/src/main.rs`
 - Modify: `crates/bin-server/Cargo.toml`
 
-- [ ] **Step 1: Wire binary features for adapter selection**
+- [x] **Step 1: Wire binary features for adapter selection**
 
 Use composition-root features only:
 
@@ -536,7 +536,7 @@ memory-store = ["dep:adapter-counter-store-memory"]
 postgres-store = ["dep:adapter-counter-store-postgres"]
 ```
 
-- [ ] **Step 2: Implement the runtime wiring**
+- [x] **Step 2: Implement the runtime wiring**
 
 `main.rs` should:
 - initialize tracing
@@ -546,7 +546,7 @@ postgres-store = ["dep:adapter-counter-store-postgres"]
 - build the Axum router
 - bind and serve on the configured socket
 
-- [ ] **Step 3: Verify both feature paths compile**
+- [x] **Step 3: Verify both feature paths compile**
 
 Run: `cargo check -p bin-server`
 Expected: PASS with default memory feature
@@ -554,12 +554,12 @@ Expected: PASS with default memory feature
 Run: `cargo check -p bin-server --no-default-features --features postgres-store`
 Expected: PASS even though the Postgres adapter is only scaffolded
 
-- [ ] **Step 4: Smoke-test the binary locally**
+- [x] **Step 4: Smoke-test the binary locally**
 
 Run: `cargo run -p bin-server`
 Expected: server starts and binds without panicking
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add crates/bin-server
@@ -577,7 +577,7 @@ git commit -m "feat: add server composition root"
 - Create: `crates/integration-tests/tests/plain_mode.rs`
 - Create: `crates/integration-tests/tests/counter_mode_memory.rs`
 
-- [ ] **Step 1: Write the failing integration tests first**
+- [x] **Step 1: Write the failing integration tests first**
 
 Write black-box tests that:
 - spawn the service on an ephemeral port
@@ -587,12 +587,12 @@ Write black-box tests that:
 
 Do **not** manually construct the application service in each test.
 
-- [ ] **Step 2: Run the failing integration tests**
+- [x] **Step 2: Run the failing integration tests**
 
 Run: `cargo test -p integration-tests`
 Expected: FAIL because the test harness does not exist yet
 
-- [ ] **Step 3: Implement the shared test harness**
+- [x] **Step 3: Implement the shared test harness**
 
 Recommended shape:
 
@@ -615,12 +615,12 @@ impl TestApp {
 
 Avoid `sleep(50ms)` startup races. Bind the listener before returning, or use a readiness channel.
 
-- [ ] **Step 4: Re-run the integration tests**
+- [x] **Step 4: Re-run the integration tests**
 
 Run: `cargo test -p integration-tests`
 Expected: PASS with both plain-mode and counter-memory tests green
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add crates/test-support crates/integration-tests
@@ -635,7 +635,7 @@ git commit -m "test: add black-box integration test harness"
 - Create: `crates/adapter-counter-store-postgres/src/lib.rs`
 - Test: `crates/adapter-counter-store-postgres/src/lib.rs`
 
-- [ ] **Step 1: Write failing compile-level tests for the Postgres crate surface**
+- [x] **Step 1: Write failing compile-level tests for the Postgres crate surface**
 
 The initial goal is not a full implementation. The crate must:
 - expose a `PostgresCounterStore` type
@@ -643,12 +643,12 @@ The initial goal is not a full implementation. The crate must:
 - compile under the `postgres-store` feature path
 - return an explicit "not yet configured" or "not implemented" runtime error rather than a `todo!()`
 
-- [ ] **Step 2: Run the failing crate tests**
+- [x] **Step 2: Run the failing crate tests**
 
 Run: `cargo test -p adapter-counter-store-postgres`
 Expected: FAIL
 
-- [ ] **Step 3: Implement the scaffold only**
+- [x] **Step 3: Implement the scaffold only**
 
 Example shape:
 
@@ -668,7 +668,7 @@ impl PostgresCounterStore {
 
 This crate exists to reserve the boundary, not to finish Postgres today.
 
-- [ ] **Step 4: Re-run the crate tests and feature compile**
+- [x] **Step 4: Re-run the crate tests and feature compile**
 
 Run: `cargo test -p adapter-counter-store-postgres`
 Expected: PASS
@@ -676,7 +676,7 @@ Expected: PASS
 Run: `cargo check -p bin-server --no-default-features --features postgres-store`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add crates/adapter-counter-store-postgres crates/bin-server
@@ -693,7 +693,7 @@ git commit -m "feat: scaffold postgres counter store adapter"
 - Create: `caddy/Caddyfile`
 - Create: `scripts/deploy/deploy-compose.sh`
 
-- [ ] **Step 1: Write the packaging files for the default memory-backed runtime**
+- [x] **Step 1: Write the packaging files for the default memory-backed runtime**
 
 Requirements:
 - multi-stage Docker build for `bin-server`
@@ -701,17 +701,17 @@ Requirements:
 - `docker-compose.yml` exposing the app behind Caddy
 - Caddy reverse-proxying to the app container
 
-- [ ] **Step 2: Verify the container build**
+- [x] **Step 2: Verify the container build**
 
 Run: `docker build -t yral-onboarding-hello-world-counter-prakash .`
 Expected: image builds successfully
 
-- [ ] **Step 3: Verify local compose boot**
+- [x] **Step 3: Verify local compose boot**
 
 Run: `docker compose up --build`
 Expected: Caddy and app start; `GET /` and `GET /health` are reachable
 
-- [ ] **Step 4: Add a deploy helper script**
+- [x] **Step 4: Add a deploy helper script**
 
 The script should:
 - pull the latest image or rebuild on host
@@ -720,7 +720,7 @@ The script should:
 
 Keep secrets passed at runtime, consistent with `onboarding/2-setting-up-ci.md`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Dockerfile docker-compose.yml caddy scripts/deploy
@@ -736,7 +736,7 @@ git commit -m "ops: add 2-server deployment scaffolding"
 - Create: `.github/workflows/deploy.yml`
 - Modify: `README.md`
 
-- [ ] **Step 1: Add the CI workflow**
+- [x] **Step 1: Add the CI workflow**
 
 `ci.yml` should run on push and PR:
 - `cargo fmt --all -- --check`
@@ -744,7 +744,7 @@ git commit -m "ops: add 2-server deployment scaffolding"
 - `cargo test --workspace`
 - `cargo check -p bin-server --no-default-features --features postgres-store`
 
-- [ ] **Step 2: Add the deploy workflow skeleton**
+- [x] **Step 2: Add the deploy workflow skeleton**
 
 `deploy.yml` should prepare for later server assignment:
 - trigger on `workflow_dispatch` initially
@@ -757,14 +757,14 @@ Required secrets to document:
 - `SERVER_2_IP`
 - `DEPLOY_SSH_PRIVATE_KEY`
 
-- [ ] **Step 3: Verify workflow syntax locally**
+- [x] **Step 3: Verify workflow syntax locally**
 
 Run: `cargo test --workspace`
 Expected: PASS before relying on GitHub to validate the YAML
 
 Optionally validate YAML with your preferred linter if available.
 
-- [ ] **Step 4: Update `README.md` with local run and CI/deploy instructions**
+- [x] **Step 4: Update `README.md` with local run and CI/deploy instructions**
 
 Document:
 - workspace purpose
@@ -772,7 +772,7 @@ Document:
 - how to run the integration tests
 - how deployment will work once servers exist
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add .github README.md
@@ -786,7 +786,7 @@ git commit -m "ci: add test and deploy workflows"
 **Files:**
 - Verify only: entire workspace
 
-- [ ] **Step 1: Run the full local verification suite**
+- [x] **Step 1: Run the full local verification suite**
 
 Run: `cargo fmt --all -- --check`
 Expected: PASS
@@ -797,17 +797,17 @@ Expected: PASS
 Run: `cargo test --workspace`
 Expected: PASS
 
-- [ ] **Step 2: Verify the memory-backed binary manually**
+- [x] **Step 2: Verify the memory-backed binary manually**
 
 Run: `cargo run -p bin-server`
 Expected: server starts and serves `GET /` and `GET /health`
 
-- [ ] **Step 3: Verify container packaging**
+- [x] **Step 3: Verify container packaging**
 
 Run: `docker build -t yral-onboarding-hello-world-counter-prakash .`
 Expected: PASS
 
-- [ ] **Step 4: Review the repo shape against the design spec**
+- [x] **Step 4: Review the repo shape against the design spec**
 
 Check:
 - adapter-per-crate rule preserved
@@ -815,7 +815,7 @@ Check:
 - integration tests exist from day one
 - Postgres remains scaffolded, not prematurely forced into runtime
 
-- [ ] **Step 5: Commit any final README or verification touch-ups**
+- [x] **Step 5: Commit any final README or verification touch-ups**
 
 ```bash
 git add .

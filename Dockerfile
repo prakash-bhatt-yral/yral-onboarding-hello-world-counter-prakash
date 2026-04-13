@@ -1,10 +1,10 @@
 FROM rust:1.93.0 AS builder
 WORKDIR /app
 
-COPY Cargo.toml Cargo.lock rust-toolchain.toml rustfmt.toml clippy.toml ./
+COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
 
-RUN cargo build --release -p bin-server
+RUN cargo build --locked --release -p bin-server
 
 FROM debian:bookworm-slim
 WORKDIR /app

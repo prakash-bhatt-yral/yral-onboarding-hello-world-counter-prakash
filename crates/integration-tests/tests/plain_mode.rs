@@ -8,8 +8,7 @@ async fn plain_mode_returns_plain_hello_world() {
 
     let response = client.hello().await.expect("hello response");
 
-    assert_eq!(response.message, "Hello World");
-    assert_eq!(response.visitor_count, None);
+    assert_eq!(response, "Hello World");
 }
 
 #[tokio::test]

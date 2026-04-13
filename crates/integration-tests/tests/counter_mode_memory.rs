@@ -11,14 +11,12 @@ async fn counter_mode_returns_incrementing_counts() {
     let first = client.hello().await.expect("first response");
     let second = client.hello().await.expect("second response");
 
-    assert_eq!(first.visitor_count, Some(1));
-    assert_eq!(second.visitor_count, Some(2));
     assert_eq!(
-        first.message,
+        first,
         "Hello visitor. You are the 1'th visitor to this page"
     );
     assert_eq!(
-        second.message,
+        second,
         "Hello visitor. You are the 2'th visitor to this page"
     );
 }

@@ -1,7 +1,25 @@
 name: Deploy
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: true
+
+env:
+  APP_DIR: /home/deploy/yral-onboarding-hello-world-counter-prakash
+  IMAGE_REF: ghcr.io/${{ github.repository }}:${{ github.sha }}
+  SITE_ADDRESS: hello-world.prakash.yral.com
+  APP_HOST: 0.0.0.0
+  APP_PORT: 3000
+  GREETING_MODE: plain
+  RUST_LOG: info
+  CADDY_HTTP_PORT: 80
+  CADDY_HTTPS_PORT: 443
 
 jobs:
   deploy:
@@ -26,7 +44,9 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ github.repository }}:${{ github.sha }}
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ github.sha }}
+            ghcr.io/${{ github.repository }}:main
 
       - name: Copy deploy files to server 1
         if: ${{ secrets.SERVER_1_IP != '' }}
@@ -36,29 +56,24 @@ jobs:
           username: deploy
           key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
           source: "docker-compose.yml,caddy/Caddyfile,scripts/deploy/deploy-compose.sh"
-          target: /home/deploy/yral-onboarding-hello-world-counter-prakash
+          target: ${{ env.APP_DIR }}
 
       - name: Deploy to server 1
         if: ${{ secrets.SERVER_1_IP != '' }}
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
         with:
           host: ${{ secrets.SERVER_1_IP }}
           username: deploy
           key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
-          envs: IMAGE_REF,APP_HOST,APP_PORT,GREETING_MODE,RUST_LOG,GITHUB_TOKEN,GITHUB_ACTOR
+          envs: APP_DIR,IMAGE_REF,SITE_ADDRESS,APP_HOST,APP_PORT,GREETING_MODE,RUST_LOG,CADDY_HTTP_PORT,CADDY_HTTPS_PORT,GITHUB_TOKEN,GITHUB_ACTOR
           script: |
-            mkdir -p /home/deploy/yral-onboarding-hello-world-counter-prakash
-            cd /home/deploy/yral-onboarding-hello-world-counter-prakash
+            mkdir -p "${APP_DIR}"
+            cd "${APP_DIR}"
             echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
             bash scripts/deploy/deploy-compose.sh
-        env:
-          IMAGE_REF: ghcr.io/${{ github.repository }}:${{ github.sha }}
-          APP_HOST: 0.0.0.0
-          APP_PORT: 3000
-          GREETING_MODE: plain
-          RUST_LOG: info
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_ACTOR: ${{ github.actor }}
 
       - name: Copy deploy files to server 2
         if: ${{ secrets.SERVER_2_IP != '' }}
@@ -68,26 +83,21 @@ jobs:
           username: deploy
           key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
           source: "docker-compose.yml,caddy/Caddyfile,scripts/deploy/deploy-compose.sh"
-          target: /home/deploy/yral-onboarding-hello-world-counter-prakash
+          target: ${{ env.APP_DIR }}
 
       - name: Deploy to server 2
         if: ${{ secrets.SERVER_2_IP != '' }}
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
         with:
           host: ${{ secrets.SERVER_2_IP }}
           username: deploy
           key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
-          envs: IMAGE_REF,APP_HOST,APP_PORT,GREETING_MODE,RUST_LOG,GITHUB_TOKEN,GITHUB_ACTOR
+          envs: APP_DIR,IMAGE_REF,SITE_ADDRESS,APP_HOST,APP_PORT,GREETING_MODE,RUST_LOG,CADDY_HTTP_PORT,CADDY_HTTPS_PORT,GITHUB_TOKEN,GITHUB_ACTOR
           script: |
-            mkdir -p /home/deploy/yral-onboarding-hello-world-counter-prakash
-            cd /home/deploy/yral-onboarding-hello-world-counter-prakash
+            mkdir -p "${APP_DIR}"
+            cd "${APP_DIR}"
             echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
             bash scripts/deploy/deploy-compose.sh
-        env:
-          IMAGE_REF: ghcr.io/${{ github.repository }}:${{ github.sha }}
-          APP_HOST: 0.0.0.0
-          APP_PORT: 3000
-          GREETING_MODE: plain
-          RUST_LOG: info
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_ACTOR: ${{ github.actor }}

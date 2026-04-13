@@ -9,10 +9,8 @@ use application::ApplicationError;
 
 use crate::state::AppState;
 
-pub async fn get_hello(
-    State(state): State<AppState>,
-) -> Result<Json<types::HelloResponse>, AppHttpError> {
-    Ok(Json(state.service.hello().await?))
+pub async fn get_hello(State(state): State<AppState>) -> Result<String, AppHttpError> {
+    Ok(state.service.hello().await?.message)
 }
 
 pub async fn get_health(

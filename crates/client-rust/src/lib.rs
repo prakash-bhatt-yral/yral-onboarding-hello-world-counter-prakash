@@ -24,9 +24,9 @@ impl HelloWorldClient {
         })
     }
 
-    pub async fn hello(&self) -> Result<types::HelloResponse, ClientError> {
+    pub async fn hello(&self) -> Result<String, ClientError> {
         let response = self.http_client.get(self.endpoint("")?).send().await?;
-        self.parse_json_response(response).await
+        self.parse_text_response(response).await
     }
 
     pub async fn health(&self) -> Result<types::HealthResponse, ClientError> {
@@ -55,6 +55,20 @@ impl HelloWorldClient {
         let body = response.text().await.unwrap_or_default();
         Err(ClientError::UnexpectedStatus { status, body })
     }
+
+    async fn parse_text_response(
+        &self,
+        response: reqwest::Response,
+    ) -> Result<String, ClientError> {
+        let status = response.status();
+
+        if status.is_success() {
+            return Ok(response.text().await?);
+        }
+
+        let body = response.text().await.unwrap_or_default();
+        Err(ClientError::UnexpectedStatus { status, body })
+    }
 }
 
 #[cfg(test)]
@@ -64,7 +78,7 @@ mod tests {
     use axum::{Json, Router, routing::get};
     use http::StatusCode;
     use tokio::net::TcpListener;
-    use types::{HealthResponse, HelloResponse};
+    use types::HealthResponse;
 
     use crate::{ClientError, HelloWorldClient};
 
@@ -91,15 +105,7 @@ mod tests {
     #[tokio::test]
     async fn hello_and_health_work_without_trailing_slash() {
         let app = Router::new()
-            .route(
-                "/",
-                get(|| async {
-                    Json(HelloResponse {
-                        message: "Hello World".to_owned(),
-                        visitor_count: None,
-                    })
-                }),
-            )
+            .route("/", get(|| async { "Hello World" }))
             .route(
                 "/health",
                 get(|| async {
@@ -115,7 +121,7 @@ mod tests {
         let hello = client.hello().await.expect("hello response");
         let health = client.health().await.expect("health response");
 
-        assert_eq!(hello.message, "Hello World");
+        assert_eq!(hello, "Hello World");
         assert_eq!(health.storage, "memory");
     }
 

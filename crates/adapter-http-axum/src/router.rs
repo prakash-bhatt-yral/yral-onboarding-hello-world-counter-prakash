@@ -22,7 +22,7 @@ mod tests {
     use application::{CounterStore, CounterStoreError, GreetingMode, HelloWorldService};
     use async_trait::async_trait;
     use axum::{body::Body, http::Request};
-    use http::StatusCode;
+    use http::{StatusCode, header};
     use tower::util::ServiceExt;
 
     use crate::build_router;
@@ -69,14 +69,18 @@ mod tests {
             .expect("response");
 
         assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get(header::CONTENT_TYPE),
+            Some(&header::HeaderValue::from_static(
+                "text/plain; charset=utf-8"
+            ))
+        );
         let body = axum::body::to_bytes(response.into_body(), usize::MAX)
             .await
             .expect("body bytes");
-        let body: types::HelloResponse =
-            serde_json::from_slice(&body).expect("hello response body");
+        let body = String::from_utf8(body.to_vec()).expect("hello response body");
 
-        assert_eq!(body.message, "Hello World");
-        assert_eq!(body.visitor_count, None);
+        assert_eq!(body, "Hello World");
     }
 
     #[tokio::test]
