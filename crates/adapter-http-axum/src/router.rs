@@ -59,7 +59,12 @@ mod tests {
         let app = build_router(service);
 
         let response = app
-            .oneshot(Request::builder().uri("/").body(Body::empty()).expect("request"))
+            .oneshot(
+                Request::builder()
+                    .uri("/")
+                    .body(Body::empty())
+                    .expect("request"),
+            )
             .await
             .expect("response");
 

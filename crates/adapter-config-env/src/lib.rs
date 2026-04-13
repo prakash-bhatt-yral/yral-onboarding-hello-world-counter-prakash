@@ -12,10 +12,10 @@ pub struct AppConfig {
 
 impl AppConfig {
     pub fn from_env() -> Result<Self> {
-        Self::from_iter(std::env::vars())
+        Self::from_pairs(std::env::vars())
     }
 
-    pub fn from_iter<I, K, V>(pairs: I) -> Result<Self>
+    pub fn from_pairs<I, K, V>(pairs: I) -> Result<Self>
     where
         I: IntoIterator<Item = (K, V)>,
         K: Into<String>,
@@ -58,8 +58,8 @@ mod tests {
 
     #[test]
     fn defaults_are_applied_when_no_env_is_present() {
-        let config = AppConfig::from_iter(std::iter::empty::<(String, String)>())
-            .expect("default config");
+        let config =
+            AppConfig::from_pairs(std::iter::empty::<(String, String)>()).expect("default config");
 
         assert_eq!(config.host, "127.0.0.1");
         assert_eq!(config.port, 3000);
@@ -68,7 +68,7 @@ mod tests {
 
     #[test]
     fn explicit_counter_mode_is_parsed() {
-        let config = AppConfig::from_iter([
+        let config = AppConfig::from_pairs([
             ("APP_HOST", "0.0.0.0"),
             ("APP_PORT", "8080"),
             ("GREETING_MODE", "counter"),
@@ -82,7 +82,7 @@ mod tests {
 
     #[test]
     fn invalid_greeting_mode_is_rejected() {
-        let error = AppConfig::from_iter([("GREETING_MODE", "weird")]).expect_err("invalid mode");
+        let error = AppConfig::from_pairs([("GREETING_MODE", "weird")]).expect_err("invalid mode");
 
         assert!(error.to_string().contains("invalid GREETING_MODE"));
     }

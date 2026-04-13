@@ -18,7 +18,10 @@ pub struct HelloWorldService {
 
 impl HelloWorldService {
     pub fn new(mode: GreetingMode, counter_store: Arc<dyn CounterStore>) -> Self {
-        Self { mode, counter_store }
+        Self {
+            mode,
+            counter_store,
+        }
     }
 
     pub async fn hello(&self) -> Result<HelloResponse, ApplicationError> {
@@ -53,8 +56,8 @@ impl HelloWorldService {
 mod tests {
     use std::sync::Arc;
 
-    use async_trait::async_trait;
     use crate::{CounterStore, CounterStoreError, GreetingMode, HelloWorldService};
+    use async_trait::async_trait;
 
     struct FakeStore {
         next_count: u64,

@@ -28,7 +28,10 @@ impl Greeting {
         match self {
             Self::Plain => "Hello World".to_owned(),
             Self::Numbered(count) => {
-                format!("Hello visitor. You are the {}'th visitor to this page", count.get())
+                format!(
+                    "Hello visitor. You are the {}'th visitor to this page",
+                    count.get()
+                )
             }
         }
     }

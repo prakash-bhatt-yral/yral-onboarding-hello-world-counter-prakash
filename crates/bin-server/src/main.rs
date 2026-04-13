@@ -6,7 +6,7 @@ use adapter_observability_tracing::init_tracing;
 use application::HelloWorldService;
 use tokio::net::TcpListener;
 
-#[cfg(feature = "memory-store")]
+#[cfg(all(feature = "memory-store", not(feature = "postgres-store")))]
 use adapter_counter_store_memory::MemoryCounterStore;
 
 #[tokio::main]

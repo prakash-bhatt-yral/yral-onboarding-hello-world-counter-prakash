@@ -13,6 +13,12 @@ async fn counter_mode_returns_incrementing_counts() {
 
     assert_eq!(first.visitor_count, Some(1));
     assert_eq!(second.visitor_count, Some(2));
-    assert_eq!(first.message, "Hello visitor. You are the 1'th visitor to this page");
-    assert_eq!(second.message, "Hello visitor. You are the 2'th visitor to this page");
+    assert_eq!(
+        first.message,
+        "Hello visitor. You are the 1'th visitor to this page"
+    );
+    assert_eq!(
+        second.message,
+        "Hello visitor. You are the 2'th visitor to this page"
+    );
 }
