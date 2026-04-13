@@ -6,6 +6,9 @@ version.workspace = true
 
 [dependencies]
 async-trait.workspace = true
+domain = { path = "../domain" }
 thiserror.workspace = true
 types = { path = "../types" }
 
+[dev-dependencies]
+tokio.workspace = true
