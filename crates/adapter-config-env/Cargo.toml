@@ -6,4 +6,4 @@ version.workspace = true
 
 [dependencies]
 anyhow.workspace = true
-
+application = { path = "../application" }
