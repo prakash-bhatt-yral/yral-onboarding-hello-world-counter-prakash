@@ -8,3 +8,5 @@ version.workspace = true
 application = { path = "../application" }
 thiserror.workspace = true
 
+[dev-dependencies]
+tokio.workspace = true
