@@ -6,5 +6,8 @@ version.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+adapter-counter-store-memory = { path = "../adapter-counter-store-memory" }
+adapter-http-axum = { path = "../adapter-http-axum" }
+application = { path = "../application" }
+axum.workspace = true
 tokio.workspace = true
-

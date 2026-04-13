@@ -6,4 +6,7 @@ version.workspace = true
 
 [dependencies]
 anyhow.workspace = true
-
+client-rust = { path = "../client-rust" }
+tokio.workspace = true
+test-support = { path = "../test-support" }
+types = { path = "../types" }
