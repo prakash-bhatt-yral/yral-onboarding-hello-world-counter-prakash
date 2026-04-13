@@ -1,0 +1,20 @@
+[package]
+name = "bin-server"
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[features]
+default = ["memory-store"]
+memory-store = ["dep:adapter-counter-store-memory"]
+postgres-store = ["dep:adapter-counter-store-postgres"]
+
+[dependencies]
+adapter-config-env = { path = "../adapter-config-env" }
+adapter-http-axum = { path = "../adapter-http-axum" }
+adapter-observability-tracing = { path = "../adapter-observability-tracing" }
+application = { path = "../application" }
+tokio.workspace = true
+adapter-counter-store-memory = { path = "../adapter-counter-store-memory", optional = true }
+adapter-counter-store-postgres = { path = "../adapter-counter-store-postgres", optional = true }
+

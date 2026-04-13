@@ -1,0 +1,10 @@
+[package]
+name = "adapter-counter-store-postgres"
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+application = { path = "../application" }
+thiserror.workspace = true
+

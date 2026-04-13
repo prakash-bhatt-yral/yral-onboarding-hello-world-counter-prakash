@@ -1,0 +1,12 @@
+[package]
+name = "client-rust"
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+reqwest.workspace = true
+types = { path = "../types" }
+url.workspace = true
+

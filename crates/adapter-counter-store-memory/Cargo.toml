@@ -1,0 +1,11 @@
+[package]
+name = "adapter-counter-store-memory"
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+application = { path = "../application" }
+async-trait.workspace = true
+tokio.workspace = true
+

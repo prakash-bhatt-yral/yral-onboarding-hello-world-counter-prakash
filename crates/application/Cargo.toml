@@ -1,0 +1,11 @@
+[package]
+name = "application"
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+thiserror.workspace = true
+types = { path = "../types" }
+

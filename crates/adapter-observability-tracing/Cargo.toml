@@ -1,0 +1,9 @@
+[package]
+name = "adapter-observability-tracing"
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+tracing-subscriber.workspace = true
+

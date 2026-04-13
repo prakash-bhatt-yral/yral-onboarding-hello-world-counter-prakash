@@ -1,0 +1,13 @@
+[package]
+name = "adapter-http-axum"
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+application = { path = "../application" }
+axum.workspace = true
+http.workspace = true
+tokio.workspace = true
+types = { path = "../types" }
+
