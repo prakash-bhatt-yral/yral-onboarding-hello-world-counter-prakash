@@ -22,11 +22,18 @@ env:
   CADDY_HTTPS_PORT: 443
 
 jobs:
+  verify:
+    uses: ./.github/workflows/verify-reusable.yml
+
   deploy:
+    needs: verify
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    env:
+      SERVER_1_IP: ${{ secrets.SERVER_1_IP }}
+      SERVER_2_IP: ${{ secrets.SERVER_2_IP }}
 
     steps:
       - name: Checkout
@@ -49,23 +56,23 @@ jobs:
             ghcr.io/${{ github.repository }}:main
 
       - name: Copy deploy files to server 1
-        if: ${{ secrets.SERVER_1_IP != '' }}
+        if: ${{ env.SERVER_1_IP != '' }}
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.SERVER_1_IP }}
+          host: ${{ env.SERVER_1_IP }}
           username: deploy
           key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
           source: "docker-compose.yml,caddy/Caddyfile,scripts/deploy/deploy-compose.sh"
           target: ${{ env.APP_DIR }}
 
       - name: Deploy to server 1
-        if: ${{ secrets.SERVER_1_IP != '' }}
+        if: ${{ env.SERVER_1_IP != '' }}
         uses: appleboy/ssh-action@v1.2.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
         with:
-          host: ${{ secrets.SERVER_1_IP }}
+          host: ${{ env.SERVER_1_IP }}
           username: deploy
           key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
           envs: APP_DIR,IMAGE_REF,SITE_ADDRESS,APP_HOST,APP_PORT,GREETING_MODE,RUST_LOG,CADDY_HTTP_PORT,CADDY_HTTPS_PORT,GITHUB_TOKEN,GITHUB_ACTOR
@@ -76,23 +83,23 @@ jobs:
             bash scripts/deploy/deploy-compose.sh
 
       - name: Copy deploy files to server 2
-        if: ${{ secrets.SERVER_2_IP != '' }}
+        if: ${{ env.SERVER_2_IP != '' }}
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.SERVER_2_IP }}
+          host: ${{ env.SERVER_2_IP }}
           username: deploy
           key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
           source: "docker-compose.yml,caddy/Caddyfile,scripts/deploy/deploy-compose.sh"
           target: ${{ env.APP_DIR }}
 
       - name: Deploy to server 2
-        if: ${{ secrets.SERVER_2_IP != '' }}
+        if: ${{ env.SERVER_2_IP != '' }}
         uses: appleboy/ssh-action@v1.2.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
         with:
-          host: ${{ secrets.SERVER_2_IP }}
+          host: ${{ env.SERVER_2_IP }}
           username: deploy
           key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
           envs: APP_DIR,IMAGE_REF,SITE_ADDRESS,APP_HOST,APP_PORT,GREETING_MODE,RUST_LOG,CADDY_HTTP_PORT,CADDY_HTTPS_PORT,GITHUB_TOKEN,GITHUB_ACTOR
