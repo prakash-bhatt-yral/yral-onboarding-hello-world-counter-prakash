@@ -124,8 +124,9 @@ jobs:
               exit 1
               ;;
             dead:dead)
-              echo "Both database nodes are unreachable."
-              exit 1
+              echo "Bootstrapping fresh cluster."
+              primary_host="${SERVER_1_IP}"
+              replica_host="${SERVER_2_IP}"
               ;;
             primary:primary)
               echo "Unsafe cluster state: both nodes report primary."
