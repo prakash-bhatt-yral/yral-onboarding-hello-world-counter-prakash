@@ -127,6 +127,8 @@ jobs:
               echo "Bootstrapping fresh cluster."
               primary_host="${SERVER_1_IP}"
               replica_host="${SERVER_2_IP}"
+              echo "server_1_state=primary" >> "$GITHUB_OUTPUT"
+              echo "server_2_state=standby" >> "$GITHUB_OUTPUT"
               ;;
             primary:primary)
               echo "Unsafe cluster state: both nodes report primary."
