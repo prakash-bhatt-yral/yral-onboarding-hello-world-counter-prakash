@@ -180,7 +180,7 @@ jobs:
 
             export DATABASE_PRIMARY_HOST="${{ steps.topology.outputs.primary_host }}"
             export DATABASE_REPLICA_HOST="${{ steps.topology.outputs.replica_host }}"
-            if [[ "${SERVER_1_IP}" == "${{ steps.topology.outputs.primary_host }}" ]]; then
+            if [[ "${{ env.SERVER_1_IP }}" == "${{ steps.topology.outputs.primary_host }}" ]]; then
               export DB_ROLE="primary"
             else
               export DB_ROLE="standby"
@@ -222,7 +222,7 @@ jobs:
 
             export DATABASE_PRIMARY_HOST="${{ steps.topology.outputs.primary_host }}"
             export DATABASE_REPLICA_HOST="${{ steps.topology.outputs.replica_host }}"
-            if [[ "${SERVER_2_IP}" == "${{ steps.topology.outputs.primary_host }}" ]]; then
+            if [[ "${{ env.SERVER_2_IP }}" == "${{ steps.topology.outputs.primary_host }}" ]]; then
               export DB_ROLE="primary"
             else
               export DB_ROLE="standby"
