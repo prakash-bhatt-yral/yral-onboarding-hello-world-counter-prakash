@@ -8,7 +8,7 @@ Rust/Axum onboarding service workspace built with a hexagonal architecture and p
 - `crates/domain`: pure greeting rules and invariants
 - `crates/application`: use cases and outbound ports
 - `crates/adapter-counter-store-memory`: in-memory store for local/dev and early onboarding
-- `crates/adapter-counter-store-postgres`: scaffolded Postgres boundary for later integration
+- `crates/adapter-counter-store-postgres`: Postgres-backed counter store
 - `crates/adapter-config-env`: runtime env parsing
 - `crates/adapter-observability-tracing`: tracing setup
 - `crates/adapter-http-axum`: Axum router and handlers
@@ -19,14 +19,14 @@ Rust/Axum onboarding service workspace built with a hexagonal architecture and p
 
 ## Current onboarding target
 
-Phase 1 is the public hello-world service:
+Phase 2 is the public counter service:
 
-- `GET /` returns plain text `Hello World`
+- `GET /` returns `Hello visitor. You are the <visitor_count>'th visitor to this page`
 - `GET /health` returns JSON health data for operations checks
-- Caddy terminates traffic in front of the Axum app
-- the deploy workflow is prepared to push the same stack to both onboarding servers
-
-The counter/database phase is not wired yet. The Postgres adapter remains scaffolded for the next milestone.
+- both app instances stay active behind the existing two-node Caddy ingress
+- each node also runs Postgres and a local HAProxy database router
+- the database topology is 2-node primary/standby streaming replication
+- standby promotion is operator-controlled to avoid unsafe 2-node auto-failover
 
 ## Local development
 
@@ -65,6 +65,28 @@ Then verify through Caddy:
 ```bash
 curl http://127.0.0.1:8080/
 curl http://127.0.0.1:8080/health
+```
+
+Run the Postgres-backed counter stack locally:
+
+```bash
+COUNTER_STORE=postgres \
+GREETING_MODE=counter \
+POSTGRES_PASSWORD=counter \
+SITE_ADDRESS=:80 \
+CADDY_HTTP_PORT=8080 \
+CADDY_HTTPS_PORT=8443 \
+bash scripts/deploy/deploy-compose.sh
+```
+
+Expected responses:
+
+```bash
+curl http://127.0.0.1:8080/
+# Hello visitor. You are the 1'th visitor to this page
+
+curl http://127.0.0.1:8080/health
+# {"status":"ok","storage":"postgres"}
 ```
 
 ## Onboarding servers
@@ -114,6 +136,7 @@ Repository secrets to set:
 - `DEPLOY_SSH_PRIVATE_KEY`: contents of `~/.ssh/yral_onboarding_deploy`
 - `SERVER_1_IP`: `94.130.13.115`
 - `SERVER_2_IP`: `88.99.151.102`
+- `POSTGRES_PASSWORD`: strong password shared by the primary, standby, and app
 - `CADDY_TLS_CERT_PEM_B64`: base64 of the shared PEM certificate, if you are pinning explicit TLS on both nodes
 - `CADDY_TLS_KEY_PEM_B64`: base64 of the shared PEM private key, if you are pinning explicit TLS on both nodes
 
@@ -125,7 +148,9 @@ The deploy workflow:
 - copies only the compose/Caddy/deploy files to each server
 - logs into GHCR on each server as `deploy`
 - renders a runtime Caddyfile on each server
+- renders node-specific Postgres and HAProxy runtime files on each server
 - when shared TLS secrets are present, writes the same cert/key to both nodes before starting Caddy
+- deploys `prakash-1` as the Postgres primary and `prakash-2` as the Postgres standby
 - starts the stack with `SITE_ADDRESS=hello-world.prakash.yral.com`
 
 ## Deploy behavior
@@ -137,6 +162,22 @@ The deploy workflow:
 
 `scripts/deploy/deploy-compose.sh` uses image-based deploys when `IMAGE_REF` is set, so the servers do not need the full source tree.
 `scripts/deploy/render-caddyfile.sh` writes `runtime/Caddyfile` and, when configured, `runtime/tls/tls.crt` and `runtime/tls/tls.key`.
+`scripts/deploy/render-postgres-runtime.sh` writes the node-specific Postgres and HAProxy config under `runtime/`.
+
+## Phase 2 topology
+
+- `prakash-1`
+  - Caddy
+  - Axum app
+  - Postgres primary
+  - HAProxy routing app traffic to the writable Postgres node
+- `prakash-2`
+  - Caddy
+  - Axum app
+  - Postgres standby
+  - HAProxy routing app traffic to the writable Postgres node
+
+Replication is asynchronous streaming replication. This keeps the service writable when the standby is down, at the cost of possible last-write loss if the primary dies before the standby catches up.
 
 ## Shared TLS Without Cloudflare Access
 
@@ -175,9 +216,20 @@ After those secrets are set and you redeploy, both nodes will present the same c
 
 ## Next onboarding step
 
-Once hello-world is live and redundant on both nodes, the next phase is:
+## Standby Promotion
 
-- switch `GREETING_MODE` to counter mode
-- wire `adapter-counter-store-postgres`
-- add a redundant database topology
-- return `Hello visitor. You are the <visitor_count>'th visitor to this page`
+If the primary database node fails:
+
+1. Promote the standby on `prakash-2`:
+
+```bash
+APP_DIR=/home/deploy/yral-onboarding-hello-world-counter-prakash \
+POSTGRES_USER=postgres \
+bash scripts/server/promote-postgres-standby.sh
+```
+
+2. Swap `DATABASE_PRIMARY_HOST` and `DATABASE_REPLICA_HOST` in the deploy workflow or deploy environment.
+3. Redeploy both nodes so each HAProxy instance points at the new primary first.
+4. Rebuild the old primary as a standby before returning it to service.
+
+This is intentionally operator-controlled. With only two data nodes, automatic failover is prone to split brain.

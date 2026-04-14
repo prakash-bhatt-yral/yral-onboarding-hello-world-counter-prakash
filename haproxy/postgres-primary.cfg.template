@@ -1,0 +1,18 @@
+global
+  log stdout format raw local0
+
+defaults
+  log global
+  mode tcp
+  timeout connect 5s
+  timeout client 1m
+  timeout server 1m
+
+frontend postgres_frontend
+  bind *:5432
+  default_backend postgres_nodes
+
+backend postgres_nodes
+  option tcp-check
+  server primary __DATABASE_PRIMARY_HOST__:5432 check inter 2s fall 2 rise 2
+  server standby __DATABASE_REPLICA_HOST__:5432 check backup inter 2s fall 2 rise 2

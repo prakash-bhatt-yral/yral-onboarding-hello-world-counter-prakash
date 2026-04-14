@@ -33,4 +33,5 @@ jobs:
       - name: Verify deploy helper scripts
         run: |
           bash scripts/test/test-render-caddyfile.sh
+          bash scripts/test/test-render-postgres-runtime.sh
           bash scripts/test/test-export-caddy-managed-cert.sh

@@ -6,7 +6,10 @@ version.workspace = true
 
 [dependencies]
 application = { path = "../application" }
+async-trait.workspace = true
 thiserror.workspace = true
+tokio.workspace = true
+tokio-postgres.workspace = true
 
 [dev-dependencies]
 tokio.workspace = true

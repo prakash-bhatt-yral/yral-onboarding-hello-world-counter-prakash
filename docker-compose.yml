@@ -3,10 +3,14 @@ services:
     image: ${IMAGE_REF:-yral-onboarding-hello-world-counter-prakash:local}
     build:
       context: .
+    depends_on:
+      - postgres-router
     environment:
       APP_HOST: ${APP_HOST:-0.0.0.0}
       APP_PORT: ${APP_PORT:-3000}
       GREETING_MODE: ${GREETING_MODE:-plain}
+      COUNTER_STORE: ${COUNTER_STORE:-memory}
+      DATABASE_URL: ${DATABASE_URL:-postgres://postgres:counter@postgres-router:5432/postgres}
       RUST_LOG: ${RUST_LOG:-info}
     expose:
       - "3000"
@@ -28,6 +32,37 @@ services:
       - caddy_data:/data
       - caddy_config:/config
 
+  postgres:
+    image: postgres:16-alpine
+    entrypoint: ["sh", "/usr/local/bin/replica-entrypoint.sh"]
+    environment:
+      DB_ROLE: ${DB_ROLE:-primary}
+      DATABASE_PRIMARY_HOST: ${DATABASE_PRIMARY_HOST:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-counter}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      PGDATA: /var/lib/postgresql/data/pgdata
+      STANDBY_NAME: ${STANDBY_NAME:-standby1}
+    ports:
+      - "${POSTGRES_PORT:-15432}:5432"
+    restart: unless-stopped
+    volumes:
+      - ./runtime/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./runtime/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+      - ./postgres/replica-entrypoint.sh:/usr/local/bin/replica-entrypoint.sh:ro
+      - postgres_data:/var/lib/postgresql/data
+
+  postgres-router:
+    image: haproxy:3.1-alpine
+    depends_on:
+      - postgres
+    expose:
+      - "5432"
+    restart: unless-stopped
+    volumes:
+      - ./runtime/haproxy-postgres.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+
 volumes:
   caddy_data:
   caddy_config:
+  postgres_data:

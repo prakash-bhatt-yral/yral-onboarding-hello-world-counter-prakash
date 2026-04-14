@@ -4,10 +4,17 @@ use anyhow::{Result, anyhow, bail};
 use application::GreetingMode;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CounterStoreConfig {
+    Memory,
+    Postgres { database_url: String },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AppConfig {
     pub host: String,
     pub port: u16,
     pub greeting_mode: GreetingMode,
+    pub counter_store: CounterStoreConfig,
 }
 
 impl AppConfig {
@@ -41,11 +48,21 @@ impl AppConfig {
             Some("counter") => GreetingMode::Counter,
             Some(other) => bail!("invalid GREETING_MODE: {other}"),
         };
+        let counter_store = match values.get("COUNTER_STORE").map(String::as_str) {
+            None | Some("memory") => CounterStoreConfig::Memory,
+            Some("postgres") => CounterStoreConfig::Postgres {
+                database_url: values.get("DATABASE_URL").cloned().ok_or_else(|| {
+                    anyhow!("DATABASE_URL is required when COUNTER_STORE=postgres")
+                })?,
+            },
+            Some(other) => bail!("invalid COUNTER_STORE: {other}"),
+        };
 
         Ok(Self {
             host,
             port,
             greeting_mode,
+            counter_store,
         })
     }
 }
@@ -54,7 +71,7 @@ impl AppConfig {
 mod tests {
     use application::GreetingMode;
 
-    use super::AppConfig;
+    use super::{AppConfig, CounterStoreConfig};
 
     #[test]
     fn defaults_are_applied_when_no_env_is_present() {
@@ -64,6 +81,7 @@ mod tests {
         assert_eq!(config.host, "127.0.0.1");
         assert_eq!(config.port, 3000);
         assert_eq!(config.greeting_mode, GreetingMode::Plain);
+        assert_eq!(config.counter_store, CounterStoreConfig::Memory);
     }
 
     #[test]
@@ -78,6 +96,7 @@ mod tests {
         assert_eq!(config.host, "0.0.0.0");
         assert_eq!(config.port, 8080);
         assert_eq!(config.greeting_mode, GreetingMode::Counter);
+        assert_eq!(config.counter_store, CounterStoreConfig::Memory);
     }
 
     #[test]
@@ -85,5 +104,32 @@ mod tests {
         let error = AppConfig::from_pairs([("GREETING_MODE", "weird")]).expect_err("invalid mode");
 
         assert!(error.to_string().contains("invalid GREETING_MODE"));
+    }
+
+    #[test]
+    fn postgres_counter_store_requires_database_url() {
+        let error = AppConfig::from_pairs([("COUNTER_STORE", "postgres")])
+            .expect_err("postgres should require a database url");
+
+        assert!(error.to_string().contains("DATABASE_URL"));
+    }
+
+    #[test]
+    fn postgres_counter_store_reads_database_url() {
+        let config = AppConfig::from_pairs([
+            ("COUNTER_STORE", "postgres"),
+            (
+                "DATABASE_URL",
+                "postgres://counter:counter@localhost/visitor_counter",
+            ),
+        ])
+        .expect("postgres config");
+
+        assert_eq!(
+            config.counter_store,
+            CounterStoreConfig::Postgres {
+                database_url: "postgres://counter:counter@localhost/visitor_counter".to_owned(),
+            }
+        );
     }
 }

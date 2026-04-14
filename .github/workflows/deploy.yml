@@ -16,10 +16,15 @@ env:
   SITE_ADDRESS: hello-world.prakash.yral.com
   APP_HOST: 0.0.0.0
   APP_PORT: 3000
-  GREETING_MODE: plain
+  GREETING_MODE: counter
+  COUNTER_STORE: postgres
   RUST_LOG: info
   CADDY_HTTP_PORT: 80
   CADDY_HTTPS_PORT: 443
+  POSTGRES_PORT: 5432
+  POSTGRES_USER: postgres
+  POSTGRES_DB: postgres
+  STANDBY_NAME: standby1
 
 jobs:
   verify:
@@ -36,6 +41,7 @@ jobs:
       SERVER_2_IP: ${{ secrets.SERVER_2_IP }}
       CADDY_TLS_CERT_PEM_B64: ${{ secrets.CADDY_TLS_CERT_PEM_B64 }}
       CADDY_TLS_KEY_PEM_B64: ${{ secrets.CADDY_TLS_KEY_PEM_B64 }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
 
     steps:
       - name: Checkout
@@ -64,20 +70,29 @@ jobs:
           host: ${{ env.SERVER_1_IP }}
           username: deploy
           key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
-          source: "docker-compose.yml,caddy/Caddyfile.template,scripts/deploy/deploy-compose.sh,scripts/deploy/render-caddyfile.sh"
+          source: "docker-compose.yml,caddy/Caddyfile.template,postgres/*.template,postgres/replica-entrypoint.sh,haproxy/postgres-primary.cfg.template,scripts/deploy/deploy-compose.sh,scripts/deploy/render-caddyfile.sh,scripts/deploy/render-postgres-runtime.sh,scripts/server/promote-postgres-standby.sh"
           target: ${{ env.APP_DIR }}
 
       - name: Deploy to server 1
         if: ${{ env.SERVER_1_IP != '' }}
         uses: appleboy/ssh-action@v1.2.0
         env:
+          COUNTER_STORE: ${{ env.COUNTER_STORE }}
+          DATABASE_PRIMARY_HOST: ${{ env.SERVER_1_IP }}
+          DATABASE_REPLICA_HOST: ${{ env.SERVER_2_IP }}
+          DB_ROLE: primary
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          POSTGRES_PORT: ${{ env.POSTGRES_PORT }}
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+          STANDBY_NAME: ${{ env.STANDBY_NAME }}
         with:
           host: ${{ env.SERVER_1_IP }}
           username: deploy
           key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
-          envs: APP_DIR,IMAGE_REF,SITE_ADDRESS,APP_HOST,APP_PORT,GREETING_MODE,RUST_LOG,CADDY_HTTP_PORT,CADDY_HTTPS_PORT,CADDY_TLS_CERT_PEM_B64,CADDY_TLS_KEY_PEM_B64,GITHUB_TOKEN,GITHUB_ACTOR
+          envs: APP_DIR,IMAGE_REF,SITE_ADDRESS,APP_HOST,APP_PORT,GREETING_MODE,COUNTER_STORE,RUST_LOG,CADDY_HTTP_PORT,CADDY_HTTPS_PORT,CADDY_TLS_CERT_PEM_B64,CADDY_TLS_KEY_PEM_B64,DB_ROLE,DATABASE_PRIMARY_HOST,DATABASE_REPLICA_HOST,POSTGRES_PORT,POSTGRES_USER,POSTGRES_DB,POSTGRES_PASSWORD,STANDBY_NAME,GITHUB_TOKEN,GITHUB_ACTOR
           script: |
             mkdir -p "${APP_DIR}"
             cd "${APP_DIR}"
@@ -91,20 +106,29 @@ jobs:
           host: ${{ env.SERVER_2_IP }}
           username: deploy
           key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
-          source: "docker-compose.yml,caddy/Caddyfile.template,scripts/deploy/deploy-compose.sh,scripts/deploy/render-caddyfile.sh"
+          source: "docker-compose.yml,caddy/Caddyfile.template,postgres/*.template,postgres/replica-entrypoint.sh,haproxy/postgres-primary.cfg.template,scripts/deploy/deploy-compose.sh,scripts/deploy/render-caddyfile.sh,scripts/deploy/render-postgres-runtime.sh,scripts/server/promote-postgres-standby.sh"
           target: ${{ env.APP_DIR }}
 
       - name: Deploy to server 2
         if: ${{ env.SERVER_2_IP != '' }}
         uses: appleboy/ssh-action@v1.2.0
         env:
+          COUNTER_STORE: ${{ env.COUNTER_STORE }}
+          DATABASE_PRIMARY_HOST: ${{ env.SERVER_1_IP }}
+          DATABASE_REPLICA_HOST: ${{ env.SERVER_2_IP }}
+          DB_ROLE: standby
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          POSTGRES_PORT: ${{ env.POSTGRES_PORT }}
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+          STANDBY_NAME: ${{ env.STANDBY_NAME }}
         with:
           host: ${{ env.SERVER_2_IP }}
           username: deploy
           key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
-          envs: APP_DIR,IMAGE_REF,SITE_ADDRESS,APP_HOST,APP_PORT,GREETING_MODE,RUST_LOG,CADDY_HTTP_PORT,CADDY_HTTPS_PORT,CADDY_TLS_CERT_PEM_B64,CADDY_TLS_KEY_PEM_B64,GITHUB_TOKEN,GITHUB_ACTOR
+          envs: APP_DIR,IMAGE_REF,SITE_ADDRESS,APP_HOST,APP_PORT,GREETING_MODE,COUNTER_STORE,RUST_LOG,CADDY_HTTP_PORT,CADDY_HTTPS_PORT,CADDY_TLS_CERT_PEM_B64,CADDY_TLS_KEY_PEM_B64,DB_ROLE,DATABASE_PRIMARY_HOST,DATABASE_REPLICA_HOST,POSTGRES_PORT,POSTGRES_USER,POSTGRES_DB,POSTGRES_PASSWORD,STANDBY_NAME,GITHUB_TOKEN,GITHUB_ACTOR
           script: |
             mkdir -p "${APP_DIR}"
             cd "${APP_DIR}"

@@ -1,0 +1,8 @@
+listen_addresses = '*'
+port = 5432
+max_connections = 100
+password_encryption = 'scram-sha-256'
+wal_level = replica
+max_wal_senders = 10
+max_replication_slots = 10
+hot_standby = on

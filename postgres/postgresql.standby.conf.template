@@ -1,0 +1,5 @@
+listen_addresses = '*'
+port = 5432
+max_connections = 100
+password_encryption = 'scram-sha-256'
+hot_standby = on
