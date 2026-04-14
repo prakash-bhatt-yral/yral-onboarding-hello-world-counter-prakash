@@ -29,3 +29,8 @@ jobs:
 
       - name: Verify postgres feature path
         run: cargo check -p bin-server --no-default-features --features postgres-store
+
+      - name: Verify deploy helper scripts
+        run: |
+          bash scripts/test/test-render-caddyfile.sh
+          bash scripts/test/test-export-caddy-managed-cert.sh

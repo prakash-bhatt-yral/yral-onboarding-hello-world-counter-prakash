@@ -23,7 +23,8 @@ services:
       - "${CADDY_HTTPS_PORT:-8443}:443"
     restart: unless-stopped
     volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./runtime/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./runtime/tls:/etc/caddy/tls:ro
       - caddy_data:/data
       - caddy_config:/config
 

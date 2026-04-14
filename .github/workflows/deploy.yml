@@ -34,6 +34,8 @@ jobs:
     env:
       SERVER_1_IP: ${{ secrets.SERVER_1_IP }}
       SERVER_2_IP: ${{ secrets.SERVER_2_IP }}
+      CADDY_TLS_CERT_PEM_B64: ${{ secrets.CADDY_TLS_CERT_PEM_B64 }}
+      CADDY_TLS_KEY_PEM_B64: ${{ secrets.CADDY_TLS_KEY_PEM_B64 }}
 
     steps:
       - name: Checkout
@@ -62,7 +64,7 @@ jobs:
           host: ${{ env.SERVER_1_IP }}
           username: deploy
           key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
-          source: "docker-compose.yml,caddy/Caddyfile,scripts/deploy/deploy-compose.sh"
+          source: "docker-compose.yml,caddy/Caddyfile.template,scripts/deploy/deploy-compose.sh,scripts/deploy/render-caddyfile.sh"
           target: ${{ env.APP_DIR }}
 
       - name: Deploy to server 1
@@ -75,7 +77,7 @@ jobs:
           host: ${{ env.SERVER_1_IP }}
           username: deploy
           key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
-          envs: APP_DIR,IMAGE_REF,SITE_ADDRESS,APP_HOST,APP_PORT,GREETING_MODE,RUST_LOG,CADDY_HTTP_PORT,CADDY_HTTPS_PORT,GITHUB_TOKEN,GITHUB_ACTOR
+          envs: APP_DIR,IMAGE_REF,SITE_ADDRESS,APP_HOST,APP_PORT,GREETING_MODE,RUST_LOG,CADDY_HTTP_PORT,CADDY_HTTPS_PORT,CADDY_TLS_CERT_PEM_B64,CADDY_TLS_KEY_PEM_B64,GITHUB_TOKEN,GITHUB_ACTOR
           script: |
             mkdir -p "${APP_DIR}"
             cd "${APP_DIR}"
@@ -89,7 +91,7 @@ jobs:
           host: ${{ env.SERVER_2_IP }}
           username: deploy
           key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
-          source: "docker-compose.yml,caddy/Caddyfile,scripts/deploy/deploy-compose.sh"
+          source: "docker-compose.yml,caddy/Caddyfile.template,scripts/deploy/deploy-compose.sh,scripts/deploy/render-caddyfile.sh"
           target: ${{ env.APP_DIR }}
 
       - name: Deploy to server 2
@@ -102,7 +104,7 @@ jobs:
           host: ${{ env.SERVER_2_IP }}
           username: deploy
           key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
-          envs: APP_DIR,IMAGE_REF,SITE_ADDRESS,APP_HOST,APP_PORT,GREETING_MODE,RUST_LOG,CADDY_HTTP_PORT,CADDY_HTTPS_PORT,GITHUB_TOKEN,GITHUB_ACTOR
+          envs: APP_DIR,IMAGE_REF,SITE_ADDRESS,APP_HOST,APP_PORT,GREETING_MODE,RUST_LOG,CADDY_HTTP_PORT,CADDY_HTTPS_PORT,CADDY_TLS_CERT_PEM_B64,CADDY_TLS_KEY_PEM_B64,GITHUB_TOKEN,GITHUB_ACTOR
           script: |
             mkdir -p "${APP_DIR}"
             cd "${APP_DIR}"

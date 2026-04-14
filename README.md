@@ -57,7 +57,7 @@ curl http://127.0.0.1:3000/health
 Run the local reverse-proxy stack:
 
 ```bash
-SITE_ADDRESS=:80 CADDY_HTTP_PORT=8080 CADDY_HTTPS_PORT=8443 docker compose up --build
+SITE_ADDRESS=:80 CADDY_HTTP_PORT=8080 CADDY_HTTPS_PORT=8443 bash scripts/deploy/deploy-compose.sh
 ```
 
 Then verify through Caddy:
@@ -114,13 +114,18 @@ Repository secrets to set:
 - `DEPLOY_SSH_PRIVATE_KEY`: contents of `~/.ssh/yral_onboarding_deploy`
 - `SERVER_1_IP`: `94.130.13.115`
 - `SERVER_2_IP`: `88.99.151.102`
+- `CADDY_TLS_CERT_PEM_B64`: base64 of the shared PEM certificate, if you are pinning explicit TLS on both nodes
+- `CADDY_TLS_KEY_PEM_B64`: base64 of the shared PEM private key, if you are pinning explicit TLS on both nodes
 
 The deploy workflow:
 
 - runs on every push to `main`
 - builds and pushes `ghcr.io/<repo>:<sha>` and `:main`
+- runs verification first through the reusable `verify` workflow job
 - copies only the compose/Caddy/deploy files to each server
 - logs into GHCR on each server as `deploy`
+- renders a runtime Caddyfile on each server
+- when shared TLS secrets are present, writes the same cert/key to both nodes before starting Caddy
 - starts the stack with `SITE_ADDRESS=hello-world.prakash.yral.com`
 
 ## Deploy behavior
@@ -131,6 +136,42 @@ The deploy workflow:
 - server: `SITE_ADDRESS=hello-world.prakash.yral.com`, `CADDY_HTTP_PORT=80`, `CADDY_HTTPS_PORT=443`
 
 `scripts/deploy/deploy-compose.sh` uses image-based deploys when `IMAGE_REF` is set, so the servers do not need the full source tree.
+`scripts/deploy/render-caddyfile.sh` writes `runtime/Caddyfile` and, when configured, `runtime/tls/tls.crt` and `runtime/tls/tls.key`.
+
+## Shared TLS Without Cloudflare Access
+
+If you cannot create a Cloudflare Origin Certificate yourself, the practical workaround is:
+
+1. extract a currently working publicly trusted cert/key from the healthy node
+2. store them as base64 GitHub secrets
+3. deploy the same cert/key to both nodes so failover does not depend on per-node ACME issuance
+
+The workflow now supports that model.
+
+To extract the current cert and key from a healthy node into ready-to-use GitHub-secret values:
+
+```bash
+bash scripts/server/export-caddy-managed-cert.sh \
+  --host 94.130.13.115 \
+  --ssh-key ~/.ssh/yral_onboarding_deploy \
+  --site-address hello-world.prakash.yral.com
+```
+
+That command writes four files into a temporary local directory:
+
+- `hello-world.prakash.yral.com.crt`
+- `hello-world.prakash.yral.com.key`
+- `CADDY_TLS_CERT_PEM_B64.txt`
+- `CADDY_TLS_KEY_PEM_B64.txt`
+
+Then set the repo secrets directly:
+
+```bash
+gh secret set CADDY_TLS_CERT_PEM_B64 < /path/to/CADDY_TLS_CERT_PEM_B64.txt
+gh secret set CADDY_TLS_KEY_PEM_B64 < /path/to/CADDY_TLS_KEY_PEM_B64.txt
+```
+
+After those secrets are set and you redeploy, both nodes will present the same cert/key pair and the one-node-down failover test should no longer depend on Caddy successfully reissuing a certificate on the surviving node.
 
 ## Next onboarding step
 
