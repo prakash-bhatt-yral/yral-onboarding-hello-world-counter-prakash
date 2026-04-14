@@ -63,8 +63,89 @@ jobs:
             ghcr.io/${{ github.repository }}:${{ github.sha }}
             ghcr.io/${{ github.repository }}:main
 
+      - name: Prepare SSH for topology probe
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "${SERVER_1_IP}" >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh-keyscan -H "${SERVER_2_IP}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Discover cluster topology
+        id: topology
+        run: |
+          role_on_server() {
+            local ip="$1"
+            local result
+
+            result="$(
+              ssh -o BatchMode=yes -o ConnectTimeout=5 "deploy@${ip}" \
+                "cd '${APP_DIR}' && docker compose exec -T postgres psql -U '${POSTGRES_USER}' -d '${POSTGRES_DB}' -tAc \"SELECT CASE WHEN pg_is_in_recovery() THEN 'standby' ELSE 'primary' END;\"" \
+                2>/dev/null || echo "dead"
+            )"
+
+            result="$(echo "${result}" | tr -d '[:space:]')"
+
+            case "${result}" in
+              primary|standby|dead)
+                echo "${result}"
+                ;;
+              *)
+                echo "unknown"
+                ;;
+            esac
+          }
+
+          server_1_state="$(role_on_server "${SERVER_1_IP}")"
+          server_2_state="$(role_on_server "${SERVER_2_IP}")"
+
+          echo "server_1_state=${server_1_state}" >> "$GITHUB_OUTPUT"
+          echo "server_2_state=${server_2_state}" >> "$GITHUB_OUTPUT"
+
+          case "${server_1_state}:${server_2_state}" in
+            primary:standby)
+              primary_host="${SERVER_1_IP}"
+              replica_host="${SERVER_2_IP}"
+              ;;
+            standby:primary)
+              primary_host="${SERVER_2_IP}"
+              replica_host="${SERVER_1_IP}"
+              ;;
+            primary:dead)
+              primary_host="${SERVER_1_IP}"
+              replica_host="${SERVER_2_IP}"
+              ;;
+            dead:primary)
+              primary_host="${SERVER_2_IP}"
+              replica_host="${SERVER_1_IP}"
+              ;;
+            dead:standby|standby:dead)
+              echo "Cluster requires manual failover before deploy: surviving node is still a standby."
+              exit 1
+              ;;
+            dead:dead)
+              echo "Both database nodes are unreachable."
+              exit 1
+              ;;
+            primary:primary)
+              echo "Unsafe cluster state: both nodes report primary."
+              exit 1
+              ;;
+            standby:standby)
+              echo "Unsafe cluster state: both nodes report standby."
+              exit 1
+              ;;
+            *)
+              echo "Unable to determine safe topology: ${server_1_state}:${server_2_state}"
+              exit 1
+              ;;
+          esac
+
+          echo "primary_host=${primary_host}" >> "$GITHUB_OUTPUT"
+          echo "replica_host=${replica_host}" >> "$GITHUB_OUTPUT"
+
       - name: Copy deploy files to server 1
-        if: ${{ env.SERVER_1_IP != '' }}
+        if: ${{ env.SERVER_1_IP != '' && steps.topology.outputs.server_1_state != 'dead' }}
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ env.SERVER_1_IP }}
@@ -74,13 +155,10 @@ jobs:
           target: ${{ env.APP_DIR }}
 
       - name: Deploy to server 1
-        if: ${{ env.SERVER_1_IP != '' }}
+        if: ${{ env.SERVER_1_IP != '' && steps.topology.outputs.server_1_state != 'dead' }}
         uses: appleboy/ssh-action@v1.2.0
         env:
           COUNTER_STORE: ${{ env.COUNTER_STORE }}
-          DATABASE_PRIMARY_HOST: ${{ env.SERVER_1_IP }}
-          DATABASE_REPLICA_HOST: ${{ env.SERVER_2_IP }}
-          DB_ROLE: primary
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
           POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
@@ -92,15 +170,24 @@ jobs:
           host: ${{ env.SERVER_1_IP }}
           username: deploy
           key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
-          envs: APP_DIR,IMAGE_REF,SITE_ADDRESS,APP_HOST,APP_PORT,GREETING_MODE,COUNTER_STORE,RUST_LOG,CADDY_HTTP_PORT,CADDY_HTTPS_PORT,CADDY_TLS_CERT_PEM_B64,CADDY_TLS_KEY_PEM_B64,DB_ROLE,DATABASE_PRIMARY_HOST,DATABASE_REPLICA_HOST,POSTGRES_PORT,POSTGRES_USER,POSTGRES_DB,POSTGRES_PASSWORD,STANDBY_NAME,GITHUB_TOKEN,GITHUB_ACTOR
+          envs: APP_DIR,IMAGE_REF,SITE_ADDRESS,APP_HOST,APP_PORT,GREETING_MODE,COUNTER_STORE,RUST_LOG,CADDY_HTTP_PORT,CADDY_HTTPS_PORT,CADDY_TLS_CERT_PEM_B64,CADDY_TLS_KEY_PEM_B64,POSTGRES_PORT,POSTGRES_USER,POSTGRES_DB,POSTGRES_PASSWORD,STANDBY_NAME,GITHUB_TOKEN,GITHUB_ACTOR
           script: |
             mkdir -p "${APP_DIR}"
             cd "${APP_DIR}"
+
+            export DATABASE_PRIMARY_HOST="${{ steps.topology.outputs.primary_host }}"
+            export DATABASE_REPLICA_HOST="${{ steps.topology.outputs.replica_host }}"
+            if [[ "${SERVER_1_IP}" == "${{ steps.topology.outputs.primary_host }}" ]]; then
+              export DB_ROLE="primary"
+            else
+              export DB_ROLE="standby"
+            fi
+
             echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
             bash scripts/deploy/deploy-compose.sh
 
       - name: Copy deploy files to server 2
-        if: ${{ env.SERVER_2_IP != '' }}
+        if: ${{ env.SERVER_2_IP != '' && steps.topology.outputs.server_2_state != 'dead' }}
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ env.SERVER_2_IP }}
@@ -110,13 +197,10 @@ jobs:
           target: ${{ env.APP_DIR }}
 
       - name: Deploy to server 2
-        if: ${{ env.SERVER_2_IP != '' }}
+        if: ${{ env.SERVER_2_IP != '' && steps.topology.outputs.server_2_state != 'dead' }}
         uses: appleboy/ssh-action@v1.2.0
         env:
           COUNTER_STORE: ${{ env.COUNTER_STORE }}
-          DATABASE_PRIMARY_HOST: ${{ env.SERVER_1_IP }}
-          DATABASE_REPLICA_HOST: ${{ env.SERVER_2_IP }}
-          DB_ROLE: standby
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
           POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
@@ -128,9 +212,18 @@ jobs:
           host: ${{ env.SERVER_2_IP }}
           username: deploy
           key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
-          envs: APP_DIR,IMAGE_REF,SITE_ADDRESS,APP_HOST,APP_PORT,GREETING_MODE,COUNTER_STORE,RUST_LOG,CADDY_HTTP_PORT,CADDY_HTTPS_PORT,CADDY_TLS_CERT_PEM_B64,CADDY_TLS_KEY_PEM_B64,DB_ROLE,DATABASE_PRIMARY_HOST,DATABASE_REPLICA_HOST,POSTGRES_PORT,POSTGRES_USER,POSTGRES_DB,POSTGRES_PASSWORD,STANDBY_NAME,GITHUB_TOKEN,GITHUB_ACTOR
+          envs: APP_DIR,IMAGE_REF,SITE_ADDRESS,APP_HOST,APP_PORT,GREETING_MODE,COUNTER_STORE,RUST_LOG,CADDY_HTTP_PORT,CADDY_HTTPS_PORT,CADDY_TLS_CERT_PEM_B64,CADDY_TLS_KEY_PEM_B64,POSTGRES_PORT,POSTGRES_USER,POSTGRES_DB,POSTGRES_PASSWORD,STANDBY_NAME,GITHUB_TOKEN,GITHUB_ACTOR
           script: |
             mkdir -p "${APP_DIR}"
             cd "${APP_DIR}"
+
+            export DATABASE_PRIMARY_HOST="${{ steps.topology.outputs.primary_host }}"
+            export DATABASE_REPLICA_HOST="${{ steps.topology.outputs.replica_host }}"
+            if [[ "${SERVER_2_IP}" == "${{ steps.topology.outputs.primary_host }}" ]]; then
+              export DB_ROLE="primary"
+            else
+              export DB_ROLE="standby"
+            fi
+
             echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
             bash scripts/deploy/deploy-compose.sh

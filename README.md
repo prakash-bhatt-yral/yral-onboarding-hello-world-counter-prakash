@@ -150,7 +150,8 @@ The deploy workflow:
 - renders a runtime Caddyfile on each server
 - renders node-specific Postgres and HAProxy runtime files on each server
 - when shared TLS secrets are present, writes the same cert/key to both nodes before starting Caddy
-- deploys `prakash-1` as the Postgres primary and `prakash-2` as the Postgres standby
+- probes both servers before each deploy and derives the safe primary/standby topology centrally
+- aborts if both nodes report unsafe roles such as `primary/primary`, `standby/standby`, or `dead/standby`
 - starts the stack with `SITE_ADDRESS=hello-world.prakash.yral.com`
 
 ## Deploy behavior
@@ -218,18 +219,21 @@ After those secrets are set and you redeploy, both nodes will present the same c
 
 ## Standby Promotion
 
-If the primary database node fails:
+If the primary database node fails, use the `Manual Failover` GitHub Actions workflow.
 
-1. Promote the standby on `prakash-2`:
+Inputs:
 
-```bash
-APP_DIR=/home/deploy/yral-onboarding-hello-world-counter-prakash \
-POSTGRES_USER=postgres \
-bash scripts/server/promote-postgres-standby.sh
-```
+- `down_server`: choose the server that is confirmed powered off or otherwise unable to serve writes
+- `confirm_server_is_down`: check the confirmation box
 
-2. Swap `DATABASE_PRIMARY_HOST` and `DATABASE_REPLICA_HOST` in the deploy workflow or deploy environment.
-3. Redeploy both nodes so each HAProxy instance points at the new primary first.
-4. Rebuild the old primary as a standby before returning it to service.
+The workflow:
+
+- refuses to run unless the operator explicitly confirms the failed node is down or isolated
+- aborts if the selected failed node is still reachable over SSH
+- aborts if the surviving node is not currently a standby
+- promotes the standby
+- re-renders the surviving node immediately so HAProxy prefers the new primary
+
+Normal deploys then rediscover topology from both nodes instead of reading GitHub variables or trusting each node in isolation.
 
 This is intentionally operator-controlled. With only two data nodes, automatic failover is prone to split brain.
