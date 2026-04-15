@@ -257,3 +257,28 @@ The workflow:
 - re-renders the surviving node immediately so HAProxy prefers the new primary
 
 This is a controlled switchover exercise, not a real-outage failover. Rebuild the stopped node as a standby before putting it back into service.
+
+## Rebuild Standby
+
+After a failover or a planned switchover, use the `Rebuild Standby` GitHub Actions workflow to return the old node to service as a replica.
+
+Inputs:
+
+- `server_to_rebuild`: choose which node should be wiped and rebuilt as the standby
+- `confirm_rebuild_standby`: check the confirmation box
+
+The workflow:
+
+- verifies the other node is currently the primary
+- refuses to rebuild the current primary
+- stops the selected node's stack
+- deletes only that node's Postgres data volume
+- redeploys the selected node as `DB_ROLE=standby`
+- verifies the rebuilt node reports `standby` and the surviving node still reports `primary`
+
+Use this after:
+
+- `Manual Failover`
+- `Planned Switchover Drill`
+
+Do not use it on the live primary.
