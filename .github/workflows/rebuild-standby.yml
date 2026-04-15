@@ -14,6 +14,11 @@ on:
         description: Confirm the selected server will be wiped and rebuilt as a standby
         required: true
         type: boolean
+      force_primary_rebuild:
+        description: Force rebuild even if the target server thinks it is a primary (useful for split-brain recovery)
+        required: true
+        type: boolean
+        default: false
 
 concurrency:
   group: deploy-main
@@ -118,8 +123,12 @@ jobs:
           fi
 
           if [[ "${rebuild_role}" == "primary" ]]; then
-            echo "refusing to rebuild the current primary as a standby"
-            exit 1
+            if [[ "${{ inputs.force_primary_rebuild }}" != "true" ]]; then
+              echo "refusing to rebuild the current primary as a standby without force_primary_rebuild=true"
+              exit 1
+            else
+              echo "force_primary_rebuild is true, allowing rebuild of a primary node"
+            fi
           fi
 
       - name: Copy deploy files to rebuild target
