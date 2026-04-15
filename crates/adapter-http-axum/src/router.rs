@@ -2,17 +2,24 @@ use std::sync::Arc;
 
 use application::HelloWorldService;
 use axum::{Router, routing::get};
+use http::HeaderValue;
 
 use crate::{
     handlers::{get_health, get_hello},
     state::AppState,
 };
 
-pub fn build_router(service: Arc<HelloWorldService>) -> Router {
+pub fn build_router(service: Arc<HelloWorldService>, server_label: impl Into<String>) -> Router {
+    let server_label =
+        HeaderValue::from_str(&server_label.into()).expect("SERVER_LABEL must be a valid header");
+
     Router::new()
         .route("/", get(get_hello))
         .route("/health", get(get_health))
-        .with_state(AppState { service })
+        .with_state(AppState {
+            service,
+            server_label,
+        })
 }
 
 #[cfg(test)]
@@ -56,7 +63,7 @@ mod tests {
                 storage: "memory",
             }),
         ));
-        let app = build_router(service);
+        let app = build_router(service, "server_1");
 
         let response = app
             .oneshot(
@@ -75,6 +82,10 @@ mod tests {
                 "text/plain; charset=utf-8"
             ))
         );
+        assert_eq!(
+            response.headers().get("x-served-by"),
+            Some(&header::HeaderValue::from_static("server_1"))
+        );
         let body = axum::body::to_bytes(response.into_body(), usize::MAX)
             .await
             .expect("body bytes");
@@ -92,7 +103,7 @@ mod tests {
                 storage: "memory",
             }),
         ));
-        let app = build_router(service);
+        let app = build_router(service, "server_2");
 
         let response = app
             .oneshot(
@@ -105,6 +116,10 @@ mod tests {
             .expect("response");
 
         assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get("x-served-by"),
+            Some(&header::HeaderValue::from_static("server_2"))
+        );
         let body = axum::body::to_bytes(response.into_body(), usize::MAX)
             .await
             .expect("body bytes");

@@ -13,6 +13,7 @@ pub enum CounterStoreConfig {
 pub struct AppConfig {
     pub host: String,
     pub port: u16,
+    pub server_label: String,
     pub greeting_mode: GreetingMode,
     pub counter_store: CounterStoreConfig,
 }
@@ -61,6 +62,10 @@ impl AppConfig {
         Ok(Self {
             host,
             port,
+            server_label: values
+                .get("SERVER_LABEL")
+                .cloned()
+                .unwrap_or_else(|| "local".to_owned()),
             greeting_mode,
             counter_store,
         })
@@ -80,6 +85,7 @@ mod tests {
 
         assert_eq!(config.host, "127.0.0.1");
         assert_eq!(config.port, 3000);
+        assert_eq!(config.server_label, "local");
         assert_eq!(config.greeting_mode, GreetingMode::Plain);
         assert_eq!(config.counter_store, CounterStoreConfig::Memory);
     }
@@ -95,8 +101,16 @@ mod tests {
 
         assert_eq!(config.host, "0.0.0.0");
         assert_eq!(config.port, 8080);
+        assert_eq!(config.server_label, "local");
         assert_eq!(config.greeting_mode, GreetingMode::Counter);
         assert_eq!(config.counter_store, CounterStoreConfig::Memory);
+    }
+
+    #[test]
+    fn server_label_is_read_from_env() {
+        let config = AppConfig::from_pairs([("SERVER_LABEL", "server_2")]).expect("server label");
+
+        assert_eq!(config.server_label, "server_2");
     }
 
     #[test]

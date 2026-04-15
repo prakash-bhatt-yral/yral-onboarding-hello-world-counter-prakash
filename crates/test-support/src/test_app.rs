@@ -32,7 +32,7 @@ impl TestApp {
         })
         .await?;
         let service = HelloWorldService::new(GreetingMode::Counter, Arc::new(store));
-        let app = build_router(Arc::new(service));
+        let app = build_router(Arc::new(service), "test-node");
 
         spawn_router(app, Some(postgres_harness)).await
     }
@@ -43,7 +43,7 @@ impl TestApp {
 
     async fn spawn(mode: GreetingMode) -> anyhow::Result<Self> {
         let service = HelloWorldService::new(mode, Arc::new(MemoryCounterStore::default()));
-        let app = build_router(Arc::new(service));
+        let app = build_router(Arc::new(service), "test-node");
         spawn_router(app, None).await
     }
 }

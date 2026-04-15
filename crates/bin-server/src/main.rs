@@ -17,7 +17,7 @@ async fn main() -> anyhow::Result<()> {
 
     let config = AppConfig::from_env()?;
     let service = build_service(&config).await?;
-    let app = build_router(Arc::new(service));
+    let app = build_router(Arc::new(service), config.server_label.clone());
     let address: SocketAddr = format!("{}:{}", config.host, config.port).parse()?;
     let listener = TcpListener::bind(address).await?;
 

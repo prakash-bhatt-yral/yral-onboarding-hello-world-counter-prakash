@@ -23,6 +23,7 @@ Phase 2 is the public counter service:
 
 - `GET /` returns `Hello visitor. You are the <visitor_count>'th visitor to this page`
 - `GET /health` returns JSON health data for operations checks
+- every HTTP response includes `X-Served-By: server_1|server_2` for drill visibility
 - both app instances stay active behind the existing two-node Caddy ingress
 - each node also runs Postgres and a local HAProxy database router
 - the database topology is 2-node primary/standby streaming replication
@@ -237,3 +238,22 @@ The workflow:
 Normal deploys then rediscover topology from both nodes instead of reading GitHub variables or trusting each node in isolation.
 
 This is intentionally operator-controlled. With only two data nodes, automatic failover is prone to split brain.
+
+## Planned Switchover Drill
+
+If you want to simulate a primary outage without pretending the VM itself is fenced, use the `Planned Switchover Drill` GitHub Actions workflow.
+
+Inputs:
+
+- `server_to_stop`: choose the current primary to stop for the drill
+- `confirm_planned_switchover`: check the confirmation box
+
+The workflow:
+
+- verifies the selected source node is currently the primary
+- verifies the surviving node is currently the standby
+- stops the selected primary node's stack first so it cannot continue serving writes
+- promotes the standby
+- re-renders the surviving node immediately so HAProxy prefers the new primary
+
+This is a controlled switchover exercise, not a real-outage failover. Rebuild the stopped node as a standby before putting it back into service.

@@ -1,7 +1,7 @@
 use axum::{
     Json,
     extract::State,
-    http::StatusCode,
+    http::{HeaderName, StatusCode, header::HeaderValue},
     response::{IntoResponse, Response},
 };
 
@@ -9,14 +9,24 @@ use application::ApplicationError;
 
 use crate::state::AppState;
 
-pub async fn get_hello(State(state): State<AppState>) -> Result<String, AppHttpError> {
-    Ok(state.service.hello().await?.message)
+const X_SERVED_BY: HeaderName = HeaderName::from_static("x-served-by");
+
+pub async fn get_hello(
+    State(state): State<AppState>,
+) -> Result<([(HeaderName, HeaderValue); 1], String), AppHttpError> {
+    Ok((
+        [(X_SERVED_BY, state.server_label.clone())],
+        state.service.hello().await?.message,
+    ))
 }
 
 pub async fn get_health(
     State(state): State<AppState>,
-) -> Result<Json<types::HealthResponse>, AppHttpError> {
-    Ok(Json(state.service.health().await?))
+) -> Result<([(HeaderName, HeaderValue); 1], Json<types::HealthResponse>), AppHttpError> {
+    Ok((
+        [(X_SERVED_BY, state.server_label.clone())],
+        Json(state.service.health().await?),
+    ))
 }
 
 pub struct AppHttpError(ApplicationError);
