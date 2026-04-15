@@ -222,6 +222,11 @@ jobs:
             exit 1
           fi
 
+      - name: Restart dependent services on primary node
+        run: |
+          ssh -o BatchMode=yes -o ConnectTimeout=10 "deploy@${{ steps.topology.outputs.primary_candidate_ip }}" \
+            "cd '${APP_DIR}' && docker compose restart postgres-router app"
+
       - name: Rebuild summary
         run: |
           echo "Standby rebuild complete."

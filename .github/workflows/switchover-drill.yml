@@ -136,6 +136,11 @@ jobs:
             echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
             bash scripts/deploy/deploy-compose.sh
 
+      - name: Restart dependent services on surviving node
+        run: |
+          ssh -o BatchMode=yes -o ConnectTimeout=10 "deploy@${{ steps.topology.outputs.target_ip }}" \
+            "cd '${APP_DIR}' && docker compose restart postgres-router app"
+
       - name: Drill summary
         run: |
           echo "Planned switchover complete."
