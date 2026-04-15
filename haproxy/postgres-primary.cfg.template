@@ -14,5 +14,5 @@ frontend postgres_frontend
 
 backend postgres_nodes
   option tcp-check
-  server primary __DATABASE_PRIMARY_HOST__:5432 check inter 2s fall 2 rise 2
-  server standby __DATABASE_REPLICA_HOST__:5432 check backup inter 2s fall 2 rise 2
+  server primary __HAPROXY_PRIMARY_HOST__:5432 check inter 2s fall 2 rise 2
+  server standby __HAPROXY_REPLICA_HOST__:5432 check backup inter 2s fall 2 rise 2

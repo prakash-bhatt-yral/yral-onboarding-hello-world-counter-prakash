@@ -157,13 +157,47 @@ jobs:
             echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
             bash scripts/deploy/deploy-compose.sh
 
+      - name: Wait for rebuilt standby readiness
+        run: |
+          role_on_server() {
+            local ip="$1"
+            local result
+
+            result="$(
+              ssh -o BatchMode=yes -o ConnectTimeout=5 "deploy@${ip}" \
+                "cd '${APP_DIR}' && docker compose exec -T postgres psql -U '${POSTGRES_USER}' -d '${POSTGRES_DB}' -tAc \"SELECT CASE WHEN pg_is_in_recovery() THEN 'standby' ELSE 'primary' END;\"" \
+                2>/dev/null || true
+            )"
+
+            echo "${result}" | tr -d '[:space:]'
+          }
+
+          for attempt in {1..30}; do
+            rebuilt_role="$(role_on_server "${{ steps.topology.outputs.rebuild_ip }}")"
+            if [[ "${rebuilt_role}" == "standby" ]]; then
+              exit 0
+            fi
+
+            echo "waiting for rebuilt standby readiness; current role='${rebuilt_role:-unavailable}' (attempt ${attempt}/30)"
+            sleep 2
+          done
+
+          echo "rebuilt standby did not become ready in time"
+          exit 1
+
       - name: Verify rebuilt standby
         run: |
           role_on_server() {
             local ip="$1"
-            ssh -o BatchMode=yes -o ConnectTimeout=5 "deploy@${ip}" \
-              "cd '${APP_DIR}' && docker compose exec -T postgres psql -U '${POSTGRES_USER}' -d '${POSTGRES_DB}' -tAc \"SELECT CASE WHEN pg_is_in_recovery() THEN 'standby' ELSE 'primary' END;\"" \
-              2>/dev/null | tr -d '[:space:]'
+            local result
+
+            result="$(
+              ssh -o BatchMode=yes -o ConnectTimeout=5 "deploy@${ip}" \
+                "cd '${APP_DIR}' && docker compose exec -T postgres psql -U '${POSTGRES_USER}' -d '${POSTGRES_DB}' -tAc \"SELECT CASE WHEN pg_is_in_recovery() THEN 'standby' ELSE 'primary' END;\"" \
+                2>/dev/null || true
+            )"
+
+            echo "${result}" | tr -d '[:space:]'
           }
 
           rebuilt_role="$(role_on_server "${{ steps.topology.outputs.rebuild_ip }}")"

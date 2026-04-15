@@ -26,7 +26,9 @@ if grep -q "synchronous_standby_names" "${TMP_DIR}/runtime/postgres/postgresql.c
   fail "primary config should not require a synchronous standby during bootstrap"
 fi
 grep -q "server primary 94.130.13.115:5432" "${TMP_DIR}/runtime/haproxy-postgres.cfg" \
-  || fail "haproxy should render the primary host"
+  && fail "primary-node haproxy should not route through the public primary IP"
+grep -q "server primary postgres:5432" "${TMP_DIR}/runtime/haproxy-postgres.cfg" \
+  || fail "primary-node haproxy should target the local postgres container"
 grep -q "server standby 88.99.151.102:5432 check backup" "${TMP_DIR}/runtime/haproxy-postgres.cfg" \
   || fail "haproxy should render the standby host as backup"
 
@@ -45,5 +47,9 @@ if grep -q "synchronous_standby_names" "${TMP_DIR}/runtime/postgres/postgresql.c
 fi
 grep -q "host    replication     postgres" "${TMP_DIR}/runtime/postgres/pg_hba.conf" \
   || fail "pg_hba should allow replication for the configured postgres user"
+grep -q "server primary 94.130.13.115:5432" "${TMP_DIR}/runtime/haproxy-postgres.cfg" \
+  || fail "standby-node haproxy should route writes to the remote primary"
+grep -q "server standby postgres:5432 check backup" "${TMP_DIR}/runtime/haproxy-postgres.cfg" \
+  || fail "standby-node haproxy should keep the local standby as backup"
 
 echo "render-postgres-runtime ok"

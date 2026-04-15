@@ -44,6 +44,9 @@ end
 unless step_names.include?("Rebuild standby node")
   fail.call("missing rebuild execution step")
 end
+unless step_names.include?("Wait for rebuilt standby readiness")
+  fail.call("missing standby readiness wait step")
+end
 unless step_names.include?("Verify rebuilt standby")
   fail.call("missing rebuild verification step")
 end

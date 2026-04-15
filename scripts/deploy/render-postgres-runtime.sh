@@ -10,6 +10,8 @@ HAPROXY_TEMPLATE_PATH="${APP_DIR}/haproxy/postgres-primary.cfg.template"
 DB_ROLE="${DB_ROLE:-primary}"
 DATABASE_PRIMARY_HOST="${DATABASE_PRIMARY_HOST:-postgres}"
 DATABASE_REPLICA_HOST="${DATABASE_REPLICA_HOST:-postgres}"
+HAPROXY_PRIMARY_HOST="${DATABASE_PRIMARY_HOST}"
+HAPROXY_REPLICA_HOST="${DATABASE_REPLICA_HOST}"
 POSTGRES_USER="${POSTGRES_USER:-postgres}"
 STANDBY_NAME="${STANDBY_NAME:-standby1}"
 
@@ -26,6 +28,8 @@ render_template() {
     -e "s/__STANDBY_NAME__/${STANDBY_NAME}/g" \
     -e "s/__DATABASE_PRIMARY_HOST__/${DATABASE_PRIMARY_HOST}/g" \
     -e "s/__DATABASE_REPLICA_HOST__/${DATABASE_REPLICA_HOST}/g" \
+    -e "s/__HAPROXY_PRIMARY_HOST__/${HAPROXY_PRIMARY_HOST}/g" \
+    -e "s/__HAPROXY_REPLICA_HOST__/${HAPROXY_REPLICA_HOST}/g" \
     -e "s/__POSTGRES_USER__/${POSTGRES_USER}/g" \
     "${source_path}" > "${output_path}"
 }
@@ -34,11 +38,15 @@ mkdir -p "${POSTGRES_RUNTIME_DIR}"
 
 case "${DB_ROLE}" in
   primary)
+    HAPROXY_PRIMARY_HOST="postgres"
+    HAPROXY_REPLICA_HOST="${DATABASE_REPLICA_HOST}"
     render_template \
       "${POSTGRES_TEMPLATE_DIR}/postgresql.primary.conf.template" \
       "${POSTGRES_RUNTIME_DIR}/postgresql.conf"
     ;;
   standby)
+    HAPROXY_PRIMARY_HOST="${DATABASE_PRIMARY_HOST}"
+    HAPROXY_REPLICA_HOST="postgres"
     render_template \
       "${POSTGRES_TEMPLATE_DIR}/postgresql.standby.conf.template" \
       "${POSTGRES_RUNTIME_DIR}/postgresql.conf"
