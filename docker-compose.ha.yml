@@ -1,0 +1,99 @@
+services:
+  etcd:
+    image: bitnami/etcd:3.5
+    environment:
+      ALLOW_NONE_AUTHENTICATION: "yes"
+      ETCD_NAME: "${NODE_NAME}"
+      ETCD_INITIAL_ADVERTISE_PEER_URLS: "http://${NODE_IP}:2380"
+      ETCD_LISTEN_PEER_URLS: "http://0.0.0.0:2380"
+      ETCD_LISTEN_CLIENT_URLS: "http://0.0.0.0:2379"
+      ETCD_ADVERTISE_CLIENT_URLS: "http://${NODE_IP}:2379"
+      ETCD_INITIAL_CLUSTER: "${ETCD_INITIAL_CLUSTER}"
+      ETCD_INITIAL_CLUSTER_TOKEN: "yral-cluster"
+      ETCD_INITIAL_CLUSTER_STATE: "new"
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+    volumes:
+      - etcd_data:/bitnami/etcd/data
+    restart: always
+
+  patroni:
+    build:
+      context: ./postgres
+      dockerfile: Dockerfile.patroni
+    environment:
+      NODE_NAME: "${NODE_NAME}"
+      ETCD_HOSTS: "etcd:2379"
+      POSTGRES_USER: "${POSTGRES_USER:-postgres}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-counter}"
+      APP_HOST: "${NODE_IP}"
+    volumes:
+      - patroni_data:/var/lib/postgresql/data
+    ports:
+      # Expose PG and Patroni API so HAProxy config on other nodes can access Patroni API dynamically
+      - "8008:8008"
+      - "5432:5432"
+    depends_on:
+      - etcd
+    restart: always
+
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    environment:
+      DB_HOST: postgres-router
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-counter}
+      POOL_MODE: transaction
+      IGNORE_STARTUP_PARAMETERS: extra_float_digits
+      LISTEN_PORT: 6432
+    depends_on:
+      - postgres-router
+    restart: always
+
+  postgres-router:
+    image: haproxy:3.1-alpine
+    volumes:
+      - ./runtime/haproxy-ha.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    expose:
+      - "5432"
+    restart: always
+
+  app:
+    image: ${IMAGE_REF:-yral-onboarding-hello-world-counter-prakash:local}
+    environment:
+      APP_HOST: "0.0.0.0"
+      APP_PORT: "3000"
+      SERVER_LABEL: "${NODE_NAME}"
+      GREETING_MODE: "${GREETING_MODE:-plain}"
+      COUNTER_STORE: "${COUNTER_STORE:-postgres}"
+      DATABASE_URL: "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-counter}@pgbouncer:6432/postgres"
+      RUST_LOG: "${RUST_LOG:-info}"
+    depends_on:
+      - pgbouncer
+    expose:
+      - "3000"
+    restart: always
+
+  caddy:
+    image: caddy:2.10.2-alpine
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    ports:
+      - "${CADDY_HTTP_PORT:-80}:80"
+      - "${CADDY_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./runtime/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./runtime/tls:/etc/caddy/tls:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+    restart: always
+
+volumes:
+  etcd_data:
+  patroni_data:
+  caddy_data:
+  caddy_config:

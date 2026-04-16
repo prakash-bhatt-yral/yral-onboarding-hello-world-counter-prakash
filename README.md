@@ -96,6 +96,7 @@ Assigned servers:
 
 - `prakash-1`: `94.130.13.115`
 - `prakash-2`: `88.99.151.102`
+- `prakash-3`: `<Pending Provisioning>`
 
 Planned public hostname:
 
@@ -137,6 +138,7 @@ Repository secrets to set:
 - `DEPLOY_SSH_PRIVATE_KEY`: contents of `~/.ssh/yral_onboarding_deploy`
 - `SERVER_1_IP`: `94.130.13.115`
 - `SERVER_2_IP`: `88.99.151.102`
+- `SERVER_3_IP`: `<Pending Provisioning>`
 - `POSTGRES_PASSWORD`: strong password shared by the primary, standby, and app
 - `CADDY_TLS_CERT_PEM_B64`: base64 of the shared PEM certificate, if you are pinning explicit TLS on both nodes
 - `CADDY_TLS_KEY_PEM_B64`: base64 of the shared PEM private key, if you are pinning explicit TLS on both nodes
@@ -166,20 +168,16 @@ The deploy workflow:
 `scripts/deploy/render-caddyfile.sh` writes `runtime/Caddyfile` and, when configured, `runtime/tls/tls.crt` and `runtime/tls/tls.key`.
 `scripts/deploy/render-postgres-runtime.sh` writes the node-specific Postgres and HAProxy config under `runtime/`.
 
-## Phase 2 topology
+## Phase 3 Topology (v7 - 3-Node Patroni Architecture)
 
-- `prakash-1`
-  - Caddy
-  - Axum app
-  - Postgres primary
-  - HAProxy routing app traffic to the writable Postgres node
-- `prakash-2`
-  - Caddy
-  - Axum app
-  - Postgres standby
-  - HAProxy routing app traffic to the writable Postgres node
+- **Servers:** `prakash-1`, `prakash-2`, and `prakash-3`.
+  - **Patroni:** Manages PostgreSQL lifecycle.
+  - **etcd:** Distributed consensus/DCS layer for robust split-brain fencing.
+  - **PgBouncer:** Connection pooling.
+  - **HAProxy:** High availability routing to active leader Patroni REST API endpoints.
+  - **App:** Retries configured natively; connecting through PgBouncer.
 
-Replication is asynchronous streaming replication. This keeps the service writable when the standby is down, at the cost of possible last-write loss if the primary dies before the standby catches up.
+Replication is configured to strictly enforce synchronous replication with `synchronous_node_count: 1` ensuring near zero data-loss at the cost of slight latency. Failover is completely automatic (TTL: 30s) providing an SLO < 10s recovery window.
 
 ## Shared TLS Without Cloudflare Access
 

@@ -61,24 +61,42 @@ impl PostgresCounterStore {
 #[async_trait]
 impl CounterStore for PostgresCounterStore {
     async fn next_visitor_count(&self) -> Result<u64, CounterStoreError> {
-        let client = self.client().await?;
-        let row = client
-            .query_one(
-                "
-                UPDATE counters
-                SET value = value + 1
-                WHERE id = 1
-                RETURNING value
-                ",
-                &[],
-            )
-            .await
-            .map_err(map_counter_store_error)?;
+        let mut retries = 3;
+        let mut delay = std::time::Duration::from_millis(250);
 
-        let value = row.get::<_, i64>(0);
-        u64::try_from(value).map_err(|error| CounterStoreError::Unavailable {
-            message: error.to_string(),
-        })
+        loop {
+            let attempt = async {
+                let client = self.client().await?;
+                client
+                    .query_one(
+                        "
+                        UPDATE counters
+                        SET value = value + 1
+                        WHERE id = 1
+                        RETURNING value
+                        ",
+                        &[],
+                    )
+                    .await
+                    .map_err(map_counter_store_error)
+            }
+            .await;
+
+            match attempt {
+                Ok(row) => {
+                    let value = row.get::<_, i64>(0);
+                    return u64::try_from(value).map_err(|error| CounterStoreError::Unavailable {
+                        message: error.to_string(),
+                    });
+                }
+                Err(e) if retries > 0 => {
+                    tokio::time::sleep(delay).await;
+                    retries -= 1;
+                    delay *= 2;
+                }
+                Err(e) => return Err(e),
+            }
+        }
     }
 
     async fn health(&self) -> Result<(), CounterStoreError> {

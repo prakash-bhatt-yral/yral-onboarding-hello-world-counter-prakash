@@ -1,0 +1,29 @@
+FROM postgres:16-alpine
+
+# Install Python, pip, curl, gettext (for envsubst) and psycopg2 dependencies
+RUN apk add --no-cache \
+    python3 \
+    py3-pip \
+    python3-dev \
+    gcc \
+    musl-dev \
+    linux-headers \
+    libpq-dev \
+    gettext \
+    curl \
+    su-exec
+
+# Install patroni with etcd3 support globally
+RUN pip3 install --break-system-packages patroni[etcd3] psycopg2-binary
+
+# Cleanup unnecessary build dependencies to keep image small
+RUN apk del gcc musl-dev linux-headers python3-dev
+
+COPY patroni.yml.template /etc/patroni.yml.template
+COPY patroni-entrypoint.sh /usr/local/bin/patroni-entrypoint.sh
+RUN chmod +x /usr/local/bin/patroni-entrypoint.sh
+
+# Patroni requires the Postgres user to own the data dir
+RUN mkdir -p /var/lib/postgresql/data && chown -R postgres:postgres /var/lib/postgresql/data
+
+ENTRYPOINT ["/usr/local/bin/patroni-entrypoint.sh"]

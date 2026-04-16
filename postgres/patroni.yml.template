@@ -1,0 +1,46 @@
+scope: "yral-cluster"
+namespace: "/patroni"
+name: "${NODE_NAME}"
+
+restapi:
+  listen: "0.0.0.0:8008"
+  connect_address: "${APP_HOST}:8008"
+
+etcd3:
+  hosts: "${ETCD_HOSTS}"
+
+bootstrap:
+  dcs:
+    ttl: 30
+    loop_wait: 10
+    retry_timeout: 10
+    maximum_lag_on_failover: 1048576
+    synchronous_mode: true
+    synchronous_mode_strict: false
+    synchronous_node_count: 1
+    postgresql:
+      use_pg_rewind: true
+      use_slots: true
+      parameters:
+        wal_level: replica
+        max_wal_senders: 10
+        max_replication_slots: 10
+  initdb:
+    - encoding: UTF8
+    - data-checksums
+
+postgresql:
+  listen: "0.0.0.0:5432"
+  connect_address: "${APP_HOST}:5432"
+  data_dir: "/var/lib/postgresql/data"
+  bin_dir: "/usr/local/bin"
+  pgpass: "/tmp/pgpass"
+  authentication:
+    replication:
+      username: "replicator"
+      password: "${POSTGRES_PASSWORD}"
+    superuser:
+      username: "${POSTGRES_USER}"
+      password: "${POSTGRES_PASSWORD}"
+  parameters:
+    shared_buffers: "128MB"
