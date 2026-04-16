@@ -3,15 +3,8 @@ name: Manual Failover
 on:
   workflow_dispatch:
     inputs:
-      down_server:
-        description: Which server is confirmed powered off or isolated
-        required: true
-        type: choice
-        options:
-          - server_1
-          - server_2
-      confirm_server_is_down:
-        description: Confirm the selected server is powered off or isolated
+      confirm_emergency_failover:
+        description: Confirm you are executing an emergency failover to rescue the cluster
         required: true
         type: boolean
 
@@ -53,52 +46,74 @@ jobs:
           ssh-keyscan -H ${{ secrets.SERVER_1_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
           ssh-keyscan -H ${{ secrets.SERVER_2_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Resolve requested failover
+      - name: Auto-discover outage and verify promotable state
         id: topology
         run: |
-          if [[ "${{ inputs.confirm_server_is_down }}" != "true" ]]; then
-            echo "operator confirmation missing; expected confirm_server_is_down=true"
+          if [[ "${{ inputs.confirm_emergency_failover }}" != "true" ]]; then
+            echo "operator confirmation missing; expected confirm_emergency_failover=true"
             exit 1
           fi
 
-          if [[ "${{ inputs.down_server }}" == "server_1" ]]; then
-            echo "failed_ip=${SERVER_1}" >> "$GITHUB_OUTPUT"
-            echo "target_ip=${SERVER_2}" >> "$GITHUB_OUTPUT"
-            echo "target_label=server_2" >> "$GITHUB_OUTPUT"
-          else
-            echo "failed_ip=${SERVER_2}" >> "$GITHUB_OUTPUT"
-            echo "target_ip=${SERVER_1}" >> "$GITHUB_OUTPUT"
-            echo "target_label=server_1" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Verify fenced and promotable state
-        id: verify
-        run: |
           role_on_server() {
             local ip="$1"
-            ssh -o BatchMode=yes -o ConnectTimeout=5 "deploy@${ip}" \
-              "cd '${APP_DIR}' && docker compose exec -T postgres psql -U '${POSTGRES_USER}' -d '${POSTGRES_DB}' -tAc \"SELECT CASE WHEN pg_is_in_recovery() THEN 'standby' ELSE 'primary' END;\"" \
-              2>/dev/null | tr -d '[:space:]'
+            local result
+            result="$(
+              ssh -o BatchMode=yes -o ConnectTimeout=5 "deploy@${ip}" \
+                "cd '${APP_DIR}' && docker compose exec -T postgres psql -U '${POSTGRES_USER}' -d '${POSTGRES_DB}' -tAc \"SELECT CASE WHEN pg_is_in_recovery() THEN 'standby' ELSE 'primary' END;\"" \
+                2>/dev/null || echo "dead"
+            )"
+            echo "${result}" | tr -d '[:space:]'
           }
 
-          if ssh -o BatchMode=yes -o ConnectTimeout=5 "deploy@${{ steps.topology.outputs.failed_ip }}" "exit 0" >/dev/null 2>&1; then
-            echo "selected fenced server is still reachable; aborting"
+          echo "Pinging Server 1 (${SERVER_1})..."
+          server_1_role="$(role_on_server "${SERVER_1}")"
+          echo "Server 1 is: ${server_1_role}"
+
+          echo "Pinging Server 2 (${SERVER_2})..."
+          server_2_role="$(role_on_server "${SERVER_2}")"
+          echo "Server 2 is: ${server_2_role}"
+
+          if [[ "${server_1_role}" == "dead" && "${server_2_role}" == "standby" ]]; then
+            echo "Failed Server IS Server 1. Target is Server 2."
+            failed_ip="${SERVER_1}"
+            target_ip="${SERVER_2}"
+            target_label="server_2"
+            target_role="standby"
+          elif [[ "${server_2_role}" == "dead" && "${server_1_role}" == "standby" ]]; then
+            echo "Failed Server IS Server 2. Target is Server 1."
+            failed_ip="${SERVER_2}"
+            target_ip="${SERVER_1}"
+            target_label="server_1"
+            target_role="standby"
+          elif [[ "${server_1_role}" == "dead" && "${server_2_role}" == "primary" ]]; then
+            echo "Error: Server 1 is dead, but Server 2 is ALREADY the primary. No failover needed. The cluster is surviving."
+            echo "Abort: Run Rebuild Standby on Server 1 when it comes back online."
+            exit 1
+          elif [[ "${server_2_role}" == "dead" && "${server_1_role}" == "primary" ]]; then
+            echo "Error: Server 2 is dead, but Server 1 is ALREADY the primary. No failover needed. The cluster is surviving."
+            echo "Abort: Run Rebuild Standby on Server 2 when it comes back online."
+            exit 1
+          elif [[ "${server_1_role}" != "dead" && "${server_2_role}" != "dead" ]]; then
+            echo "Error: BOTH servers are active. An Emergency Failover requires one dead node."
+            echo "Abort: Use switchover-drill for planned maintenance, or physically stop a node first for scream-testing."
+            exit 1
+          elif [[ "${server_1_role}" == "dead" && "${server_2_role}" == "dead" ]]; then
+            echo "Error: BOTH servers are dead. Complete datacenter outage."
+            exit 1
+          else
+            echo "Error: Invalid state detected. S1: ${server_1_role}, S2: ${server_2_role}"
             exit 1
           fi
 
-          target_role="$(role_on_server "${{ steps.topology.outputs.target_ip }}")"
-          echo "target_role=${target_role}" >> "$GITHUB_OUTPUT"
-
-          if [[ "${target_role}" != "standby" ]]; then
-            echo "target server must be a standby before promotion; got '${target_role}'"
-            exit 1
-          fi
-
+          echo "failed_ip=${failed_ip}" >> "$GITHUB_OUTPUT"
+          echo "target_ip=${target_ip}" >> "$GITHUB_OUTPUT"
+          echo "target_label=${target_label}" >> "$GITHUB_OUTPUT"
+          
           echo "======================================"
-          echo "    INITIATING RUNBOOK FAILOVER"
+          echo "    INITIATING SMART ZERO-CLICK FAILOVER"
           echo "======================================"
-          echo "Confirmed down server: [ ${{ steps.topology.outputs.failed_ip }} ]"
-          echo "Promotion target: [ ${{ steps.topology.outputs.target_ip }} ]"
+          echo "Confirmed down server: [ ${failed_ip} ]"
+          echo "Promotion target: [ ${target_ip} ]"
           echo "Promotion target role: [ ${target_role} ]"
 
       - name: Promote standby
