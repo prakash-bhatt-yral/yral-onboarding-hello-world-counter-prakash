@@ -1,6 +1,7 @@
 services:
   caddy:
     image: caddy:2.10.2-alpine
+    command: caddy run --config /etc/caddy/Caddyfile --adapter caddyfile --watch
     # host networking so Caddy can reach project apps on their published host ports
     # (e.g. localhost:3001) without any per-project network configuration
     network_mode: host
