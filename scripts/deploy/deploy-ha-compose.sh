@@ -22,6 +22,8 @@ bash scripts/deploy/render-ha-runtime.sh
 
 if [[ -n "${IMAGE_REF:-}" ]]; then
   docker compose -f docker-compose.ha.yml pull app
+  # patroni is a locally-built image — always build it, never pull
+  docker compose -f docker-compose.ha.yml build patroni
   docker compose -f docker-compose.ha.yml up -d --no-build --remove-orphans
   exit 0
 fi
