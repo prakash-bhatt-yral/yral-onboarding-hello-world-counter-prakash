@@ -1,14 +1,14 @@
 # yral-onboarding-hello-world-counter-prakash
 
-Rust/Axum onboarding service workspace built with a hexagonal architecture and prepared for the two-server `hello-world.prakash.yral.com` rollout.
+Rust/Axum onboarding service — a visitor counter running on a 3-node Patroni HA cluster at `hello-world.prakash.yral.com`.
 
 ## Workspace layout
 
 - `crates/types`: shared contracts for adapters, tests, and the client crate
 - `crates/domain`: pure greeting rules and invariants
 - `crates/application`: use cases and outbound ports
-- `crates/adapter-counter-store-memory`: in-memory store for local/dev and early onboarding
-- `crates/adapter-counter-store-postgres`: Postgres-backed counter store
+- `crates/adapter-counter-store-memory`: in-memory store for local/dev
+- `crates/adapter-counter-store-postgres`: Postgres-backed counter store with exponential backoff retries
 - `crates/adapter-config-env`: runtime env parsing
 - `crates/adapter-observability-tracing`: tracing setup
 - `crates/adapter-http-axum`: Axum router and handlers
@@ -17,17 +17,58 @@ Rust/Axum onboarding service workspace built with a hexagonal architecture and p
 - `crates/bin-server`: composition root and runnable server binary
 - `crates/integration-tests`: black-box tests through the client crate
 
-## Current onboarding target
+## Service
 
-Phase 2 is the public counter service:
+`GET /` returns `Hello visitor. You are the <visitor_count>'th visitor to this page`  
+`GET /health` returns JSON health data  
+Every response includes `X-Served-By: server_1|server_2|server_3` for drill visibility.
 
-- `GET /` returns `Hello visitor. You are the <visitor_count>'th visitor to this page`
-- `GET /health` returns JSON health data for operations checks
-- every HTTP response includes `X-Served-By: server_1|server_2` for drill visibility
-- both app instances stay active behind the existing two-node Caddy ingress
-- each node also runs Postgres and a local HAProxy database router
-- the database topology is 2-node primary/standby streaming replication
-- standby promotion is operator-controlled to avoid unsafe 2-node auto-failover
+---
+
+## Architecture
+
+### Production topology
+
+Three servers run two independent Docker Compose stacks each:
+
+```
+*.prakash.yral.com
+        │ :80/:443
+        ▼
+┌─────────────────────────────────────────────────────────┐
+│  infra/docker-compose.infra.yml  (per server, shared)   │
+│  Caddy — TLS termination + hostname-based routing       │
+│    hello-world.prakash.yral.com  →  localhost:3001      │
+│    next-project.prakash.yral.com →  localhost:3002      │
+└───────────────────────────┬─────────────────────────────┘
+                            │ host network
+┌───────────────────────────▼─────────────────────────────┐
+│  docker-compose.ha.yml  (this project)                  │
+│  app  :3001 (host)  ←──────────────────────────────     │
+│  pgbouncer  →  postgres-router (HAProxy)  →  patroni    │
+│  patroni  ←─→  etcd  (3-node consensus)                 │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Infra layer** is deployed once per server and shared by all projects. Adding a new project means adding one Caddyfile block and publishing the app on the next free host port (`3002`, `3003`, …).
+
+**App layer** (`docker-compose.ha.yml`) owns Patroni HA Postgres with:
+- etcd for distributed consensus (split-brain fencing)
+- PgBouncer for connection pooling (transaction mode)
+- HAProxy for primary-only routing via Patroni `/primary` health endpoint
+- Rust app with exponential backoff retries (3 attempts, 250ms → 500ms → 1s)
+
+### Servers
+
+| Name | IP |
+|------|----|
+| `prakash-1` | `94.130.13.115` |
+| `prakash-2` | `88.99.151.102` |
+| `prakash-3` | `138.201.129.173` |
+
+Public hostname: `hello-world.prakash.yral.com`
+
+---
 
 ## Local development
 
@@ -39,36 +80,19 @@ cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace
 ```
 
-Run the app directly:
+Run the app directly (in-memory counter):
 
 ```bash
 APP_HOST=127.0.0.1 APP_PORT=3000 GREETING_MODE=plain cargo run -p bin-server
 ```
 
-Expected responses:
-
-```bash
-curl http://127.0.0.1:3000/
-# Hello World
-
-curl http://127.0.0.1:3000/health
-# {"status":"ok","storage":"memory"}
-```
-
-Run the local reverse-proxy stack:
+Run the local reverse-proxy stack (uses `docker-compose.yml`, not the HA compose):
 
 ```bash
 SITE_ADDRESS=:80 CADDY_HTTP_PORT=8080 CADDY_HTTPS_PORT=8443 bash scripts/deploy/deploy-compose.sh
 ```
 
-Then verify through Caddy:
-
-```bash
-curl http://127.0.0.1:8080/
-curl http://127.0.0.1:8080/health
-```
-
-Run the Postgres-backed counter stack locally:
+Run with Postgres counter locally:
 
 ```bash
 COUNTER_STORE=postgres \
@@ -80,203 +104,123 @@ CADDY_HTTPS_PORT=8443 \
 bash scripts/deploy/deploy-compose.sh
 ```
 
-Expected responses:
-
-```bash
-curl http://127.0.0.1:8080/
-# Hello visitor. You are the 1'th visitor to this page
-
-curl http://127.0.0.1:8080/health
-# {"status":"ok","storage":"postgres"}
-```
-
-## Onboarding servers
-
-Assigned servers:
-
-- `prakash-1`: `94.130.13.115`
-- `prakash-2`: `88.99.151.102`
-- `prakash-3`: `<Pending Provisioning>`
-
-Planned public hostname:
-
-- `hello-world.prakash.yral.com`
+---
 
 ## Server bootstrap
 
-Create a dedicated CI deploy key pair locally:
+### First-time setup (per server)
+
+Create the deploy SSH key pair locally:
 
 ```bash
 ssh-keygen -t ed25519 -f ~/.ssh/yral_onboarding_deploy -C "github-actions-deploy"
 ```
 
-Copy the bootstrap script to each server while you still have root:
+Bootstrap the `deploy` user on each server while you have root access:
 
 ```bash
-scp scripts/server/bootstrap-deploy-user.sh root@94.130.13.115:/root/
-scp scripts/server/bootstrap-deploy-user.sh root@88.99.151.102:/root/
+for IP in 94.130.13.115 88.99.151.102 138.201.129.173; do
+  scp scripts/server/bootstrap-deploy-user.sh root@${IP}:/root/
+  ssh root@${IP} 'bash /root/bootstrap-deploy-user.sh "$(cat)"' \
+    < ~/.ssh/yral_onboarding_deploy.pub
+done
 ```
 
-Run it on each server with the CI public key:
+The script creates the `deploy` user, adds it to the `docker` group, and installs the CI public key.
 
-```bash
-ssh root@94.130.13.115 'bash /root/bootstrap-deploy-user.sh "$(cat)"' < ~/.ssh/yral_onboarding_deploy.pub
-ssh root@88.99.151.102 'bash /root/bootstrap-deploy-user.sh "$(cat)"' < ~/.ssh/yral_onboarding_deploy.pub
-```
+### Bootstrap the infra layer
 
-The script:
+Run the infra deploy workflow manually from GitHub Actions once after provisioning all three servers. This installs Caddy and starts routing traffic for all registered projects.
 
-- creates the `deploy` user if needed
-- adds `deploy` to the `docker` group
-- installs the CI public key into `/home/deploy/.ssh/authorized_keys`
-- creates `/home/deploy/yral-onboarding-hello-world-counter-prakash`
+---
 
 ## GitHub Actions setup
 
-Repository secrets to set:
+### Secrets to set
 
-- `DEPLOY_SSH_PRIVATE_KEY`: contents of `~/.ssh/yral_onboarding_deploy`
-- `SERVER_1_IP`: `94.130.13.115`
-- `SERVER_2_IP`: `88.99.151.102`
-- `SERVER_3_IP`: `<Pending Provisioning>`
-- `POSTGRES_PASSWORD`: strong password shared by the primary, standby, and app
-- `CADDY_TLS_CERT_PEM_B64`: base64 of the shared PEM certificate, if you are pinning explicit TLS on both nodes
-- `CADDY_TLS_KEY_PEM_B64`: base64 of the shared PEM private key, if you are pinning explicit TLS on both nodes
+| Secret | Value |
+|--------|-------|
+| `DEPLOY_SSH_PRIVATE_KEY` | contents of `~/.ssh/yral_onboarding_deploy` |
+| `POSTGRES_PASSWORD` | strong password for Patroni/PgBouncer/app |
+| `CADDY_TLS_CERT_PEM_B64` | base64 of the wildcard PEM certificate |
+| `CADDY_TLS_KEY_PEM_B64` | base64 of the wildcard PEM private key |
 
-The deploy workflow:
+Server IPs are plain env vars in the workflow files — no secrets needed for them.
 
-- runs on every push to `main`
-- builds and pushes `ghcr.io/<repo>:<sha>` and `:main`
-- runs verification first through the reusable `verify` workflow job
-- copies only the compose/Caddy/deploy files to each server
-- logs into GHCR on each server as `deploy`
-- renders a runtime Caddyfile on each server
-- renders node-specific Postgres and HAProxy runtime files on each server
-- when shared TLS secrets are present, writes the same cert/key to both nodes before starting Caddy
-- probes both servers before each deploy and derives the safe primary/standby topology centrally
-- aborts if both nodes report unsafe roles such as `primary/primary`, `standby/standby`, or `dead/standby`
-- starts the stack with `SITE_ADDRESS=hello-world.prakash.yral.com`
+### Workflows
 
-## Deploy behavior
+| Workflow | Trigger | Purpose |
+|----------|---------|---------|
+| `ci.yml` | Pull request | Runs `verify-reusable` (fmt, clippy, tests) |
+| `deploy.yml` | Push to `main` | Builds image, deploys `docker-compose.ha.yml` to all 3 servers |
+| `deploy-infra.yml` | Push to `main` (infra paths) or manual | Deploys `infra/docker-compose.infra.yml` (Caddy) to all 3 servers |
+| `patroni-reinit.yml` | Manual | Wipes and re-seeds a member that has diverged (Patroni reinit) |
+| `patroni-switchover.yml` | Manual | Graceful leadership transfer between Patroni members |
 
-`docker-compose.yml` is written to support both local and server modes:
+### TLS cert management
 
-- local: `SITE_ADDRESS=:80`, `CADDY_HTTP_PORT=8080`, `CADDY_HTTPS_PORT=8443`
-- server: `SITE_ADDRESS=hello-world.prakash.yral.com`, `CADDY_HTTP_PORT=80`, `CADDY_HTTPS_PORT=443`
-
-`scripts/deploy/deploy-compose.sh` uses image-based deploys when `IMAGE_REF` is set, so the servers do not need the full source tree.
-`scripts/deploy/render-caddyfile.sh` writes `runtime/Caddyfile` and, when configured, `runtime/tls/tls.crt` and `runtime/tls/tls.key`.
-`scripts/deploy/render-postgres-runtime.sh` writes the node-specific Postgres and HAProxy config under `runtime/`.
-
-## Phase 3 Topology (v7 - 3-Node Patroni Architecture)
-
-- **Servers:** `prakash-1`, `prakash-2`, and `prakash-3`.
-  - **Patroni:** Manages PostgreSQL lifecycle.
-  - **etcd:** Distributed consensus/DCS layer for robust split-brain fencing.
-  - **PgBouncer:** Connection pooling.
-  - **HAProxy:** High availability routing to active leader Patroni REST API endpoints.
-  - **App:** Retries configured natively; connecting through PgBouncer.
-
-Replication is configured to strictly enforce synchronous replication with `synchronous_node_count: 1` ensuring near zero data-loss at the cost of slight latency. Failover is completely automatic (TTL: 30s) providing an SLO < 10s recovery window.
-
-## Shared TLS Without Cloudflare Access
-
-If you cannot create a Cloudflare Origin Certificate yourself, the practical workaround is:
-
-1. extract a currently working publicly trusted cert/key from the healthy node
-2. store them as base64 GitHub secrets
-3. deploy the same cert/key to both nodes so failover does not depend on per-node ACME issuance
-
-The workflow now supports that model.
-
-To extract the current cert and key from a healthy node into ready-to-use GitHub-secret values:
+The wildcard cert for `*.prakash.yral.com` covers every project subdomain. To extract the current cert from a running server:
 
 ```bash
 bash scripts/server/export-caddy-managed-cert.sh \
   --host 94.130.13.115 \
   --ssh-key ~/.ssh/yral_onboarding_deploy \
+  --app-dir /home/deploy/yral-onboarding-hello-world-counter-prakash/infra \
   --site-address hello-world.prakash.yral.com
 ```
 
-That command writes four files into a temporary local directory:
-
-- `hello-world.prakash.yral.com.crt`
-- `hello-world.prakash.yral.com.key`
-- `CADDY_TLS_CERT_PEM_B64.txt`
-- `CADDY_TLS_KEY_PEM_B64.txt`
-
-Then set the repo secrets directly:
+Then set the secrets:
 
 ```bash
 gh secret set CADDY_TLS_CERT_PEM_B64 < /path/to/CADDY_TLS_CERT_PEM_B64.txt
-gh secret set CADDY_TLS_KEY_PEM_B64 < /path/to/CADDY_TLS_KEY_PEM_B64.txt
+gh secret set CADDY_TLS_KEY_PEM_B64  < /path/to/CADDY_TLS_KEY_PEM_B64.txt
 ```
 
-After those secrets are set and you redeploy, both nodes will present the same cert/key pair and the one-node-down failover test should no longer depend on Caddy successfully reissuing a certificate on the surviving node.
+After setting secrets, re-run `deploy-infra` to push the cert to all three servers.
 
-## Next onboarding step
+---
 
-## Standby Promotion
+## Adding a new project to the same servers
 
-If the primary database node fails, use the `Manual Failover` GitHub Actions workflow.
+1. Pick the next free host port (`3002`, `3003`, …).
+2. Add a site block to `infra/Caddyfile.template` in this repo:
+   ```
+   new-project.prakash.yral.com {
+   __TLS_DIRECTIVE__
+       encode zstd gzip
+       reverse_proxy localhost:3002
+   }
+   ```
+3. In the new project's `docker-compose`, publish the app on that port:
+   ```yaml
+   ports:
+     - "3002:3000"
+   ```
+4. Merge to `main` here — `deploy-infra.yml` triggers and reloads Caddy on all servers.
+5. Deploy the new project's repo independently.
 
-Inputs:
+---
 
-- `down_server`: choose the server that is confirmed powered off or otherwise unable to serve writes
-- `confirm_server_is_down`: check the confirmation box
+## Patroni operations
 
-The workflow:
+### Graceful switchover (planned maintenance)
 
-- refuses to run unless the operator explicitly confirms the failed node is down or isolated
-- aborts if the selected failed node is still reachable over SSH
-- aborts if the surviving node is not currently a standby
-- promotes the standby
-- re-renders the surviving node immediately so HAProxy prefers the new primary
+Use the `Patroni Switchover` workflow. Select the current leader to demote and confirm. Patroni performs a clean leadership transfer with zero data loss.
 
-Normal deploys then rediscover topology from both nodes instead of reading GitHub variables or trusting each node in isolation.
+### Re-initialise a diverged member
 
-This is intentionally operator-controlled. With only two data nodes, automatic failover is prone to split brain.
+Use the `Patroni Reinit` workflow. Select the member to wipe and confirm. Patroni re-seeds it from the current leader via `pg_basebackup`.
 
-## Planned Switchover Drill
+### Chaos scripts
 
-If you want to simulate a primary outage without pretending the VM itself is fenced, use the `Planned Switchover Drill` GitHub Actions workflow.
+Located in `scripts/chaos/`. Run on the relevant server after SSHing in:
 
-Inputs:
+| Script | Action | Asserts |
+|--------|--------|---------|
+| `kill-primary.sh` | `kill -9` the Patroni primary | New leader elected within 30s |
+| `partition-node.sh` | `iptables` drop etcd ports | Node demotes after TTL; staging only |
+| `fill-disk.sh` | Fill WAL disk to 100% | Postgres stops writes without WAL corruption |
+| `slow-degradation.sh` | Throttle CPU/IO | No false failover triggered; staging only |
+| `reboot-all.sh` | Simultaneous reboot of all 3 servers | Cluster recovers within 60s |
 
-- `server_to_stop`: choose the current primary to stop for the drill
-- `confirm_planned_switchover`: check the confirmation box
-
-The workflow:
-
-- verifies the selected source node is currently the primary
-- verifies the surviving node is currently the standby
-- stops the selected primary node's stack first so it cannot continue serving writes
-- promotes the standby
-- re-renders the surviving node immediately so HAProxy prefers the new primary
-
-This is a controlled switchover exercise, not a real-outage failover. Rebuild the stopped node as a standby before putting it back into service.
-
-## Rebuild Standby
-
-After a failover or a planned switchover, use the `Rebuild Standby` GitHub Actions workflow to return the old node to service as a replica.
-
-Inputs:
-
-- `server_to_rebuild`: choose which node should be wiped and rebuilt as the standby
-- `confirm_rebuild_standby`: check the confirmation box
-
-The workflow:
-
-- verifies the other node is currently the primary
-- refuses to rebuild the current primary
-- stops the selected node's stack
-- deletes only that node's Postgres data volume
-- redeploys the selected node as `DB_ROLE=standby`
-- verifies the rebuilt node reports `standby` and the surviving node still reports `primary`
-
-Use this after:
-
-- `Manual Failover`
-- `Planned Switchover Drill`
-
-Do not use it on the live primary.
+Run chaos in staging or during maintenance windows only. `kill-primary.sh` is safe on production.

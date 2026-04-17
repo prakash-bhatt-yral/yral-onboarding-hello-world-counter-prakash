@@ -5,11 +5,6 @@ export APP_HOST="${APP_HOST:-0.0.0.0}"
 export APP_PORT="${APP_PORT:-3000}"
 export GREETING_MODE="${GREETING_MODE:-plain}"
 export RUST_LOG="${RUST_LOG:-info}"
-export SITE_ADDRESS="${SITE_ADDRESS:-hello-world.prakash.yral.com}"
-export CADDY_HTTP_PORT="${CADDY_HTTP_PORT:-80}"
-export CADDY_HTTPS_PORT="${CADDY_HTTPS_PORT:-443}"
-export CADDY_TLS_CERT_PEM_B64="${CADDY_TLS_CERT_PEM_B64:-}"
-export CADDY_TLS_KEY_PEM_B64="${CADDY_TLS_KEY_PEM_B64:-}"
 
 export SERVER_1_IP="${SERVER_1_IP:-}"
 export SERVER_2_IP="${SERVER_2_IP:-}"
@@ -23,7 +18,6 @@ export COUNTER_STORE="${COUNTER_STORE:-postgres}"
 export POSTGRES_USER="${POSTGRES_USER:-postgres}"
 export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-counter}"
 
-bash scripts/deploy/render-caddyfile.sh
 bash scripts/deploy/render-ha-runtime.sh
 
 if [[ -n "${IMAGE_REF:-}" ]]; then

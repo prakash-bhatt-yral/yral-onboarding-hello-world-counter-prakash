@@ -10,7 +10,20 @@ services:
       ETCD_ADVERTISE_CLIENT_URLS: "http://${NODE_IP}:2379"
       ETCD_INITIAL_CLUSTER: "${ETCD_INITIAL_CLUSTER}"
       ETCD_INITIAL_CLUSTER_TOKEN: "yral-cluster"
-      ETCD_INITIAL_CLUSTER_STATE: "new"
+      # ETCD_INITIAL_CLUSTER_STATE is intentionally omitted here and set dynamically
+      # by the entrypoint: "new" on first boot, "existing" on every subsequent restart.
+      # Hardcoding "new" with an existing data dir causes etcd to refuse to start.
+      ETCD_INITIAL_CLUSTER_STATE: "${ETCD_INITIAL_CLUSTER_STATE:-new}"
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        if [ -f /bitnami/etcd/data/member/snap/db ]; then
+          export ETCD_INITIAL_CLUSTER_STATE=existing
+        else
+          export ETCD_INITIAL_CLUSTER_STATE=new
+        fi
+        exec /opt/bitnami/scripts/etcd/entrypoint.sh /opt/bitnami/scripts/etcd/run.sh
     ports:
       - "2379:2379"
       - "2380:2380"
@@ -24,7 +37,8 @@ services:
       dockerfile: Dockerfile.patroni
     environment:
       NODE_NAME: "${NODE_NAME}"
-      ETCD_HOSTS: "etcd:2379"
+      # All 3 etcd endpoints so Patroni can reach DCS even if the local etcd container is down
+      ETCD_HOSTS: "${SERVER_1_IP}:2379,${SERVER_2_IP}:2379,${SERVER_3_IP}:2379"
       POSTGRES_USER: "${POSTGRES_USER:-postgres}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-counter}"
       APP_HOST: "${NODE_IP}"
@@ -72,28 +86,12 @@ services:
       RUST_LOG: "${RUST_LOG:-info}"
     depends_on:
       - pgbouncer
-    expose:
-      - "3000"
-    restart: always
-
-  caddy:
-    image: caddy:2.10.2-alpine
-    environment:
-      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    # Publish on host port 3001 so the shared infra Caddy can reach this app
+    # via localhost:3001. Each project on these servers uses a unique 300x port.
     ports:
-      - "${CADDY_HTTP_PORT:-80}:80"
-      - "${CADDY_HTTPS_PORT:-443}:443"
-    volumes:
-      - ./runtime/Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./runtime/tls:/etc/caddy/tls:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - app
+      - "3001:3000"
     restart: always
 
 volumes:
   etcd_data:
   patroni_data:
-  caddy_data:
-  caddy_config:

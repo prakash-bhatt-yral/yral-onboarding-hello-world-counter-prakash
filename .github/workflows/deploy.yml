@@ -13,17 +13,17 @@ concurrency:
 env:
   APP_DIR: /home/deploy/yral-onboarding-hello-world-counter-prakash
   IMAGE_REF: ghcr.io/${{ github.repository }}:${{ github.sha }}
-  SITE_ADDRESS: hello-world.prakash.yral.com
   APP_HOST: 0.0.0.0
   APP_PORT: 3000
   GREETING_MODE: counter
   COUNTER_STORE: postgres
   RUST_LOG: info
-  CADDY_HTTP_PORT: 80
-  CADDY_HTTPS_PORT: 443
   POSTGRES_PORT: 5432
   POSTGRES_USER: postgres
   POSTGRES_DB: postgres
+  SERVER_1_IP: 94.130.13.115
+  SERVER_2_IP: 88.99.151.102
+  SERVER_3_IP: 138.201.129.173
 
 jobs:
   verify:
@@ -36,11 +36,6 @@ jobs:
       contents: read
       packages: write
     env:
-      SERVER_1_IP: ${{ secrets.SERVER_1_IP }}
-      SERVER_2_IP: ${{ secrets.SERVER_2_IP }}
-      SERVER_3_IP: ${{ secrets.SERVER_3_IP }}
-      CADDY_TLS_CERT_PEM_B64: ${{ secrets.CADDY_TLS_CERT_PEM_B64 }}
-      CADDY_TLS_KEY_PEM_B64: ${{ secrets.CADDY_TLS_KEY_PEM_B64 }}
       POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
 
     steps:
@@ -70,33 +65,35 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          
+
           declare -A SERVERS
           SERVERS=(
             ["server_1"]="${SERVER_1_IP}"
             ["server_2"]="${SERVER_2_IP}"
             ["server_3"]="${SERVER_3_IP}"
           )
-          
+
           for NODE_NAME in "${!SERVERS[@]}"; do
             NODE_IP="${SERVERS[$NODE_NAME]}"
-            if [[ -z "${NODE_IP}" ]]; then 
+            if [[ -z "${NODE_IP}" ]]; then
               echo "Skipping ${NODE_NAME} (No IP provided)"
               continue
             fi
-            
+
             echo "--> Bootstrapping ${NODE_NAME} at ${NODE_IP}"
             ssh-keyscan -H "${NODE_IP}" >> ~/.ssh/known_hosts 2>/dev/null || true
-            
+
             ssh "deploy@${NODE_IP}" "mkdir -p ${APP_DIR} ${APP_DIR}/runtime/postgres"
-            scp -r docker-compose.ha.yml caddy postgres haproxy scripts "deploy@${NODE_IP}:${APP_DIR}/"
-            
+            scp -r docker-compose.ha.yml postgres haproxy scripts "deploy@${NODE_IP}:${APP_DIR}/"
+
             ssh "deploy@${NODE_IP}" \
               "export APP_DIR='${APP_DIR}'; \
                export IMAGE_REF='${IMAGE_REF}'; \
-               export SITE_ADDRESS='${SITE_ADDRESS}'; \
                export APP_HOST='${APP_HOST}'; \
                export APP_PORT='${APP_PORT}'; \
+               export GREETING_MODE='${GREETING_MODE}'; \
+               export COUNTER_STORE='${COUNTER_STORE}'; \
+               export RUST_LOG='${RUST_LOG}'; \
                export SERVER_1_IP='${SERVER_1_IP}'; \
                export SERVER_2_IP='${SERVER_2_IP}'; \
                export SERVER_3_IP='${SERVER_3_IP}'; \
