@@ -20,6 +20,19 @@ export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-counter}"
 
 bash scripts/deploy/render-ha-runtime.sh
 
+# Detect whether etcd has already been bootstrapped on this node.
+# The official etcd image is distroless (no shell), so detection must happen
+# here on the host by inspecting the named volume via a throwaway alpine container.
+PROJECT_NAME="$(basename "${APP_DIR}")"
+if docker run --rm \
+     -v "${PROJECT_NAME}_etcd_data:/data" \
+     alpine:3 \
+     test -f /data/member/snap/db 2>/dev/null; then
+  export ETCD_INITIAL_CLUSTER_STATE=existing
+else
+  export ETCD_INITIAL_CLUSTER_STATE=new
+fi
+
 if [[ -n "${IMAGE_REF:-}" ]]; then
   docker compose -f docker-compose.ha.yml pull app
   # patroni is a locally-built image — always build it, never pull

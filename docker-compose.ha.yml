@@ -10,19 +10,10 @@ services:
       ETCD_ADVERTISE_CLIENT_URLS: "http://${NODE_IP}:2379"
       ETCD_INITIAL_CLUSTER: "${ETCD_INITIAL_CLUSTER}"
       ETCD_INITIAL_CLUSTER_TOKEN: "yral-cluster"
-      # ETCD_INITIAL_CLUSTER_STATE is set dynamically by the entrypoint:
-      # "new" on first boot, "existing" on every subsequent restart.
-      # Hardcoding "new" with an existing data dir causes etcd to refuse to start.
-    entrypoint:
-      - /bin/sh
-      - -c
-      - |
-        if [ -f /etcd-data/member/snap/db ]; then
-          export ETCD_INITIAL_CLUSTER_STATE=existing
-        else
-          export ETCD_INITIAL_CLUSTER_STATE=new
-        fi
-        exec /usr/local/bin/etcd
+      # Detected by deploy-ha-compose.sh before compose up: "new" on first boot,
+      # "existing" on every subsequent restart. The etcd image is distroless so
+      # shell-based entrypoint detection is not possible inside the container.
+      ETCD_INITIAL_CLUSTER_STATE: "${ETCD_INITIAL_CLUSTER_STATE:-new}"
     ports:
       - "2379:2379"
       - "2380:2380"
