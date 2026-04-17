@@ -1,3 +1,4 @@
+#![allow(clippy::needless_return)]
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 /// Opaque guard — keeps Sentry flush-on-drop alive for the process lifetime.
