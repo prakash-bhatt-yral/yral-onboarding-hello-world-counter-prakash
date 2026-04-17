@@ -28,6 +28,9 @@ bootstrap:
   initdb:
     - encoding: UTF8
     - data-checksums
+  pg_hba:
+    - host replication replicator 0.0.0.0/0 md5
+    - host all all 0.0.0.0/0 md5
 
 postgresql:
   listen: "0.0.0.0:5432"
@@ -42,5 +45,8 @@ postgresql:
     superuser:
       username: "${POSTGRES_USER}"
       password: "${POSTGRES_PASSWORD}"
+  pg_hba:
+    - host replication replicator 0.0.0.0/0 md5
+    - host all all 0.0.0.0/0 md5
   parameters:
     shared_buffers: "128MB"
