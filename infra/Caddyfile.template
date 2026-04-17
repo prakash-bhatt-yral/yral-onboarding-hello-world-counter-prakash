@@ -10,8 +10,8 @@ __TLS_DIRECTIVE__
 #   3. In the new project's docker-compose, publish the app on that host port.
 #   4. Run the deploy-infra workflow to reload Caddy.
 #
-# example-project.prakash.yral.com {
-# __TLS_DIRECTIVE__
-#     encode zstd gzip
-#     reverse_proxy localhost:3002
-# }
+estatedao.prakash.yral.com {
+__TLS_DIRECTIVE__
+    encode zstd gzip
+    reverse_proxy localhost:3002
+}
