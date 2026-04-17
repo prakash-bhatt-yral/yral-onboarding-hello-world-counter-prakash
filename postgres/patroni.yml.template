@@ -29,8 +29,8 @@ bootstrap:
     - encoding: UTF8
     - data-checksums
   pg_hba:
-    - host replication replicator 0.0.0.0/0 md5
-    - host all all 0.0.0.0/0 md5
+    - host replication replicator 0.0.0.0/0 trust
+    - host all all 0.0.0.0/0 trust
 
 postgresql:
   listen: "0.0.0.0:5432"
@@ -46,7 +46,7 @@ postgresql:
       username: "${POSTGRES_USER}"
       password: "${POSTGRES_PASSWORD}"
   pg_hba:
-    - host replication replicator 0.0.0.0/0 md5
-    - host all all 0.0.0.0/0 md5
+    - host replication replicator 0.0.0.0/0 trust
+    - host all all 0.0.0.0/0 trust
   parameters:
     shared_buffers: "128MB"
