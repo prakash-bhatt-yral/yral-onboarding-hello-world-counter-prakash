@@ -1,0 +1,45 @@
+name: Deploy Sentry
+
+on:
+  workflow_dispatch:
+
+env:
+  SERVER_1_IP: 94.130.13.115
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy deploy script to server_1
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ env.SERVER_1_IP }}
+          username: deploy
+          key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          source: scripts/deploy/deploy-sentry.sh
+          target: /tmp/
+
+      - name: Run deploy-sentry.sh on server_1
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          SENTRY_ADMIN_EMAIL: ${{ secrets.SENTRY_ADMIN_EMAIL }}
+          SENTRY_ADMIN_PASSWORD: ${{ secrets.SENTRY_ADMIN_PASSWORD }}
+          GOOGLE_CLIENT_ID: ${{ secrets.SENTRY_GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.SENTRY_GOOGLE_CLIENT_SECRET }}
+        with:
+          host: ${{ env.SERVER_1_IP }}
+          username: deploy
+          key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          envs: SENTRY_ADMIN_EMAIL,SENTRY_ADMIN_PASSWORD,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET
+          script: |
+            # Prerequisite: deploy user must have passwordless sudo (NOPASSWD: ALL)
+            # Verify with: sudo -n true && echo "ok"
+            chmod +x /tmp/scripts/deploy/deploy-sentry.sh
+            sudo \
+              SENTRY_ADMIN_EMAIL="$SENTRY_ADMIN_EMAIL" \
+              SENTRY_ADMIN_PASSWORD="$SENTRY_ADMIN_PASSWORD" \
+              GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID" \
+              GOOGLE_CLIENT_SECRET="$GOOGLE_CLIENT_SECRET" \
+              /tmp/scripts/deploy/deploy-sentry.sh

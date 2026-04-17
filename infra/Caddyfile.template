@@ -15,3 +15,9 @@ __TLS_DIRECTIVE__
     encode zstd gzip
     reverse_proxy localhost:3002
 }
+
+sentry.prakash.yral.com {
+__TLS_DIRECTIVE__
+    encode zstd gzip
+    reverse_proxy localhost:9000
+}

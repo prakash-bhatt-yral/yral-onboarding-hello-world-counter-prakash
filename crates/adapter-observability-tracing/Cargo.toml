@@ -4,6 +4,10 @@ edition.workspace = true
 license.workspace = true
 version.workspace = true
 
-[dependencies]
-tracing-subscriber.workspace = true
+[features]
+default = ["sentry"]
+sentry = ["dep:sentry"]
 
+[dependencies]
+sentry = { workspace = true, optional = true }
+tracing-subscriber = { workspace = true, features = ["env-filter", "fmt", "registry"] }

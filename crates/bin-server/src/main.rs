@@ -2,7 +2,7 @@ use std::{net::SocketAddr, sync::Arc};
 
 use adapter_config_env::AppConfig;
 use adapter_http_axum::build_router;
-use adapter_observability_tracing::init_tracing;
+use adapter_observability_tracing::init_observability;
 use application::HelloWorldService;
 use tokio::net::TcpListener;
 
@@ -13,7 +13,7 @@ use adapter_counter_store_postgres::{PostgresCounterStore, PostgresCounterStoreC
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    init_tracing();
+    let _guard = init_observability(std::env::var("SENTRY_DSN").ok());
 
     let config = AppConfig::from_env()?;
     let service = build_service(&config).await?;

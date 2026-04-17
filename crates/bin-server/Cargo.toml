@@ -13,7 +13,7 @@ postgres-store = ["dep:adapter-counter-store-postgres"]
 anyhow.workspace = true
 adapter-config-env = { path = "../adapter-config-env" }
 adapter-http-axum = { path = "../adapter-http-axum" }
-adapter-observability-tracing = { path = "../adapter-observability-tracing" }
+adapter-observability-tracing = { path = "../adapter-observability-tracing", features = ["sentry"] }
 axum.workspace = true
 application = { path = "../application" }
 tokio.workspace = true
