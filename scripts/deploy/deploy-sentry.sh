@@ -1,22 +1,27 @@
 #!/usr/bin/env bash
 # Bootstraps Sentry self-hosted on the current machine.
-# Must be run as root (or via sudo). All required config is passed via env vars:
+# Runs as the deploy user (no sudo required). All required config is passed via env vars:
 #   SENTRY_ADMIN_EMAIL    — initial superuser email
 #   SENTRY_ADMIN_PASSWORD — initial superuser password
-#   GOOGLE_CLIENT_ID      — Google OAuth client ID
-#   GOOGLE_CLIENT_SECRET  — Google OAuth client secret
+#   GOOGLE_CLIENT_ID      — Google OAuth client ID (optional)
+#   GOOGLE_CLIENT_SECRET  — Google OAuth client secret (optional)
 set -euo pipefail
 
-# --- Swap (idempotent) ---
-if ! swapon --show | grep -q /swapfile; then
-  echo "Creating 16G swapfile..."
-  fallocate -l 16G /swapfile
-  chmod 600 /swapfile
-  mkswap /swapfile
-  swapon /swapfile
-  echo '/swapfile none swap sw 0 0' >> /etc/fstab
+# --- Swap (only attempted if running as root; skipped otherwise) ---
+# server_1 has 62 GB RAM so swap is not required for Sentry to run.
+if [ "$(id -u)" -eq 0 ]; then
+  if ! swapon --show | grep -q /swapfile; then
+    echo "Creating 16G swapfile..."
+    fallocate -l 16G /swapfile
+    chmod 600 /swapfile
+    mkswap /swapfile
+    swapon /swapfile
+    echo '/swapfile none swap sw 0 0' >> /etc/fstab
+  else
+    echo "Swap already configured."
+  fi
 else
-  echo "Swap already configured."
+  echo "Not running as root — skipping swap setup (62 GB RAM is sufficient without swap)."
 fi
 
 # --- Clone sentry/self-hosted ---

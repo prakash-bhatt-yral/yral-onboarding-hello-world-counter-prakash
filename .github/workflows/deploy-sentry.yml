@@ -34,12 +34,9 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
           envs: SENTRY_ADMIN_EMAIL,SENTRY_ADMIN_PASSWORD,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET
           script: |
-            # Prerequisite: deploy user must have passwordless sudo (NOPASSWD: ALL)
-            # Verify with: sudo -n true && echo "ok"
             chmod +x /tmp/scripts/deploy/deploy-sentry.sh
-            sudo \
-              SENTRY_ADMIN_EMAIL="$SENTRY_ADMIN_EMAIL" \
-              SENTRY_ADMIN_PASSWORD="$SENTRY_ADMIN_PASSWORD" \
-              GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID" \
-              GOOGLE_CLIENT_SECRET="$GOOGLE_CLIENT_SECRET" \
-              /tmp/scripts/deploy/deploy-sentry.sh
+            SENTRY_ADMIN_EMAIL="$SENTRY_ADMIN_EMAIL" \
+            SENTRY_ADMIN_PASSWORD="$SENTRY_ADMIN_PASSWORD" \
+            GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID" \
+            GOOGLE_CLIENT_SECRET="$GOOGLE_CLIENT_SECRET" \
+            /tmp/scripts/deploy/deploy-sentry.sh
