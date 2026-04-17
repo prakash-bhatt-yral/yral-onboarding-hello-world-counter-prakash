@@ -1,34 +1,33 @@
 services:
   etcd:
-    image: bitnami/etcd:3.5
+    image: gcr.io/etcd-development/etcd:v3.5.17
     environment:
-      ALLOW_NONE_AUTHENTICATION: "yes"
       ETCD_NAME: "${NODE_NAME}"
+      ETCD_DATA_DIR: "/etcd-data"
       ETCD_INITIAL_ADVERTISE_PEER_URLS: "http://${NODE_IP}:2380"
       ETCD_LISTEN_PEER_URLS: "http://0.0.0.0:2380"
       ETCD_LISTEN_CLIENT_URLS: "http://0.0.0.0:2379"
       ETCD_ADVERTISE_CLIENT_URLS: "http://${NODE_IP}:2379"
       ETCD_INITIAL_CLUSTER: "${ETCD_INITIAL_CLUSTER}"
       ETCD_INITIAL_CLUSTER_TOKEN: "yral-cluster"
-      # ETCD_INITIAL_CLUSTER_STATE is intentionally omitted here and set dynamically
-      # by the entrypoint: "new" on first boot, "existing" on every subsequent restart.
+      # ETCD_INITIAL_CLUSTER_STATE is set dynamically by the entrypoint:
+      # "new" on first boot, "existing" on every subsequent restart.
       # Hardcoding "new" with an existing data dir causes etcd to refuse to start.
-      ETCD_INITIAL_CLUSTER_STATE: "${ETCD_INITIAL_CLUSTER_STATE:-new}"
     entrypoint:
       - /bin/sh
       - -c
       - |
-        if [ -f /bitnami/etcd/data/member/snap/db ]; then
+        if [ -f /etcd-data/member/snap/db ]; then
           export ETCD_INITIAL_CLUSTER_STATE=existing
         else
           export ETCD_INITIAL_CLUSTER_STATE=new
         fi
-        exec /opt/bitnami/scripts/etcd/entrypoint.sh /opt/bitnami/scripts/etcd/run.sh
+        exec /usr/local/bin/etcd
     ports:
       - "2379:2379"
       - "2380:2380"
     volumes:
-      - etcd_data:/bitnami/etcd/data
+      - etcd_data:/etcd-data
     restart: always
 
   patroni:
