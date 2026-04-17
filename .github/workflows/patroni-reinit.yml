@@ -1,0 +1,48 @@
+name: Patroni Reinit
+on:
+  workflow_dispatch:
+    inputs:
+      target_server:
+        description: 'Server to re-initialize (e.g. server_1, server_2, server_3)'
+        required: true
+        type: choice
+        options:
+          - server_1
+          - server_2
+          - server_3
+      confirm_reinit:
+        description: 'Confirm wipe and re-seed of the corrupted timeline'
+        required: true
+        type: boolean
+        default: false
+
+jobs:
+  patroni-reinit:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.confirm_reinit == 'true' }}
+    env:
+      SERVER_1_IP: ${{ secrets.SERVER_1_IP }}
+      SERVER_2_IP: ${{ secrets.SERVER_2_IP }}
+      SERVER_3_IP: ${{ secrets.SERVER_3_IP }}
+      APP_DIR: /home/deploy/yral-onboarding-hello-world-counter-prakash
+    steps:
+      - name: Execute patronictl reinit
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          
+          declare -A SERVERS
+          SERVERS=(
+            ["server_1"]="${SERVER_1_IP}"
+            ["server_2"]="${SERVER_2_IP}"
+            ["server_3"]="${SERVER_3_IP}"
+          )
+          
+          TARGET_NODE="${{ github.event.inputs.target_server }}"
+          TARGET_IP="${SERVERS[$TARGET_NODE]}"
+          
+          ssh-keyscan -H "${TARGET_IP}" >> ~/.ssh/known_hosts 2>/dev/null || true
+          
+          echo "Connecting to ${TARGET_NODE} to trigger Patroni reinit..."
+          ssh "deploy@${TARGET_IP}" "cd ${APP_DIR} && docker compose -f docker-compose.ha.yml exec -T patroni patronictl -c /tmp/patroni.yml reinit yral-cluster ${TARGET_NODE} --force"

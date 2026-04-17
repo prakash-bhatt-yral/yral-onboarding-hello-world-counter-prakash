@@ -1,0 +1,16 @@
+services:
+  caddy:
+    image: caddy:2.10.2-alpine
+    # host networking so Caddy can reach project apps on their published host ports
+    # (e.g. localhost:3001) without any per-project network configuration
+    network_mode: host
+    volumes:
+      - ./runtime/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./runtime/tls:/etc/caddy/tls:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: always
+
+volumes:
+  caddy_data:
+  caddy_config:

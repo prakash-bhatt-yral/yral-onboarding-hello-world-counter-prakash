@@ -1,0 +1,24 @@
+global
+  log stdout format raw local0
+
+defaults
+  log global
+  mode tcp
+  option tcplog
+  timeout client 1m
+  timeout connect 10s
+  timeout server 1m
+  retries 3
+
+frontend postgres_front
+  bind *:5432
+  default_backend patroni_primary
+
+backend patroni_primary
+  option httpchk GET /primary
+  http-check expect status 200
+  # inter 2s fall 3 rise 2 -> ~6s fail detection (closing Patroni TTL window tradeoff)
+  default-server inter 2s fall 3 rise 2
+  server server_1 __SERVER_1_IP__:5432 check port 8008
+  server server_2 __SERVER_2_IP__:5432 check port 8008
+  server server_3 __SERVER_3_IP__:5432 check port 8008

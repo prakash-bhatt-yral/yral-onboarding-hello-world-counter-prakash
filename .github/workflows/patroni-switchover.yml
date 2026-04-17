@@ -1,0 +1,48 @@
+name: Patroni Switchover
+on:
+  workflow_dispatch:
+    inputs:
+      target_leader:
+        description: 'Server to demote (e.g. server_1, server_2, server_3)'
+        required: true
+        type: choice
+        options:
+          - server_1
+          - server_2
+          - server_3
+      confirm_switchover:
+        description: 'Confirm graceful leadership transfer'
+        required: true
+        type: boolean
+        default: false
+
+jobs:
+  patroni-switchover:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.confirm_switchover == 'true' }}
+    env:
+      SERVER_1_IP: ${{ secrets.SERVER_1_IP }}
+      SERVER_2_IP: ${{ secrets.SERVER_2_IP }}
+      SERVER_3_IP: ${{ secrets.SERVER_3_IP }}
+      APP_DIR: /home/deploy/yral-onboarding-hello-world-counter-prakash
+    steps:
+      - name: Execute patronictl switchover
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          
+          declare -A SERVERS
+          SERVERS=(
+            ["server_1"]="${SERVER_1_IP}"
+            ["server_2"]="${SERVER_2_IP}"
+            ["server_3"]="${SERVER_3_IP}"
+          )
+          
+          TARGET_NODE="${{ github.event.inputs.target_leader }}"
+          TARGET_IP="${SERVERS[$TARGET_NODE]}"
+          
+          ssh-keyscan -H "${TARGET_IP}" >> ~/.ssh/known_hosts 2>/dev/null || true
+          
+          echo "Connecting to ${TARGET_NODE} to trigger Patroni switchover..."
+          ssh "deploy@${TARGET_IP}" "cd ${APP_DIR} && docker compose -f docker-compose.ha.yml exec -T patroni patronictl -c /tmp/patroni.yml switchover yral-cluster --master ${TARGET_NODE} --force"

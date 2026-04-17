@@ -1,0 +1,17 @@
+hello-world.prakash.yral.com {
+__TLS_DIRECTIVE__
+    encode zstd gzip
+    reverse_proxy localhost:3001
+}
+
+# To register a new project on *.prakash.yral.com:
+#   1. Pick the next available host port (3002, 3003, …).
+#   2. Add a block below, replacing the hostname and port.
+#   3. In the new project's docker-compose, publish the app on that host port.
+#   4. Run the deploy-infra workflow to reload Caddy.
+#
+# example-project.prakash.yral.com {
+# __TLS_DIRECTIVE__
+#     encode zstd gzip
+#     reverse_proxy localhost:3002
+# }
