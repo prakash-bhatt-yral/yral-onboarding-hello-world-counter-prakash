@@ -55,11 +55,18 @@ docker compose run --rm \
   --superuser \
   --no-input || echo "Superuser may already exist — continuing."
 
-# --- Patch system.url-prefix ---
+# --- Patch system.url-prefix (handles both commented and empty default lines) ---
 CONFIG_YML="$SENTRY_DIR/sentry/config.yml"
-if grep -q "system.url-prefix: ''" "$CONFIG_YML" 2>/dev/null || ! grep -q "system.url-prefix" "$CONFIG_YML"; then
-  sed -i "s|system.url-prefix: ''|system.url-prefix: 'https://sentry.prakash.yral.com'|" "$CONFIG_YML" \
-    || echo "system.url-prefix: 'https://sentry.prakash.yral.com'" >> "$CONFIG_YML"
+sed -i "s|# system.url-prefix: https://example.sentry.com|system.url-prefix: 'https://sentry.prakash.yral.com'|" "$CONFIG_YML"
+sed -i "s|system.url-prefix: ''|system.url-prefix: 'https://sentry.prakash.yral.com'|" "$CONFIG_YML"
+# Append if still not present
+grep -q "^system.url-prefix:" "$CONFIG_YML" \
+  || echo "system.url-prefix: 'https://sentry.prakash.yral.com'" >> "$CONFIG_YML"
+
+# --- CSRF trusted origins (required when behind a reverse proxy) ---
+CONF_PY="$SENTRY_DIR/sentry/sentry.conf.py"
+if ! grep -q "^CSRF_TRUSTED_ORIGINS" "$CONF_PY"; then
+  echo "CSRF_TRUSTED_ORIGINS = ['https://sentry.prakash.yral.com']" >> "$CONF_PY"
 fi
 
 # --- Configure Google OAuth (optional — skipped if vars not set) ---
