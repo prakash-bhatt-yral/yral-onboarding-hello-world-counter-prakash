@@ -69,29 +69,24 @@ if ! grep -q "^CSRF_TRUSTED_ORIGINS" "$CONF_PY"; then
   echo "CSRF_TRUSTED_ORIGINS = ['https://sentry.prakash.yral.com']" >> "$CONF_PY"
 fi
 
-# --- Configure Google OAuth (optional — skipped if vars not set) ---
-# Note: unquoted heredoc so shell expands $GOOGLE_CLIENT_ID and $GOOGLE_CLIENT_SECRET
+# --- Configure Google OAuth via sentry config set (idempotent, stored in DB) ---
+# sentry.conf.py SOCIAL_AUTH_* keys are ignored in Sentry 25.x; use the options DB instead.
 GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID:-}"
 GOOGLE_CLIENT_SECRET="${GOOGLE_CLIENT_SECRET:-}"
-CONF_PY="$SENTRY_DIR/sentry/sentry.conf.py"
 if [[ -n "$GOOGLE_CLIENT_ID" && -n "$GOOGLE_CLIENT_SECRET" ]]; then
-  if ! grep -q "GOOGLE_CLIENT_ID" "$CONF_PY"; then
-cat >> "$CONF_PY" <<EOF
-
-# Google OAuth — restricted to @gobazzinga.io
-SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = "${GOOGLE_CLIENT_ID}"
-SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = "${GOOGLE_CLIENT_SECRET}"
-SOCIAL_AUTH_GOOGLE_OAUTH2_WHITELISTED_DOMAINS = ["gobazzinga.io"]
-EOF
-  fi
+  docker compose run --rm web sentry config set auth-google.client-id "${GOOGLE_CLIENT_ID}"
+  docker compose run --rm web sentry config set auth-google.client-secret "${GOOGLE_CLIENT_SECRET}"
+  echo "Google OAuth configured."
 else
   echo "GOOGLE_CLIENT_ID/SECRET not set — skipping Google OAuth configuration."
 fi
 
-# --- Start Sentry ---
+# --- Start Sentry and reload config ---
 echo "Starting Sentry..."
 cd "$SENTRY_DIR"
 docker compose up -d
+# Restart web to pick up any config changes made above
+docker compose restart web
 
 echo "Waiting for Sentry web to be healthy (up to 5 min)..."
 for i in $(seq 1 30); do
