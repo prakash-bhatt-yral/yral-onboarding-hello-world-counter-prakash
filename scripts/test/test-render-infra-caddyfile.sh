@@ -65,8 +65,8 @@ INFRA_DIR="${TMP_DIR}/infra" SENTRY_SERVER_IP="94.130.13.115" \
 grep -q 'sentry.prakash.yral.com' "${TMP_DIR}/infra/runtime/Caddyfile" \
   || fail "sentry proxy block should appear when SENTRY_ENABLED is false"
 
-grep -q 'reverse_proxy https://94.130.13.115' "${TMP_DIR}/infra/runtime/Caddyfile" \
-  || fail "sentry proxy should point to SENTRY_SERVER_IP"
+grep -q 'reverse_proxy 94.130.13.115:9000' "${TMP_DIR}/infra/runtime/Caddyfile" \
+  || fail "sentry proxy should point to SENTRY_SERVER_IP:9000"
 
 if grep -q 'localhost:9000' "${TMP_DIR}/infra/runtime/Caddyfile"; then
   fail "direct sentry block should not appear when SENTRY_ENABLED is false"
@@ -83,7 +83,7 @@ INFRA_DIR="${TMP_DIR}/infra" SENTRY_ENABLED=true \
 grep -q 'localhost:9000' "${TMP_DIR}/infra/runtime/Caddyfile" \
   || fail "direct sentry block should appear when SENTRY_ENABLED=true"
 
-if grep -q 'reverse_proxy https://' "${TMP_DIR}/infra/runtime/Caddyfile"; then
+if grep -q 'reverse_proxy 94\.130\.13\.115:9000' "${TMP_DIR}/infra/runtime/Caddyfile"; then
   fail "proxy sentry block should not appear when SENTRY_ENABLED=true"
 fi
 

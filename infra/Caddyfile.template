@@ -27,10 +27,6 @@ __SENTRY_PROXY_START__
 sentry.prakash.yral.com {
 __TLS_DIRECTIVE__
     encode zstd gzip
-    reverse_proxy https://__SENTRY_SERVER_IP__ {
-        transport http {
-            tls_insecure_skip_verify
-        }
-    }
+    reverse_proxy __SENTRY_SERVER_IP__:9000
 }
 __SENTRY_PROXY_END__
