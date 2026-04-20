@@ -23,3 +23,14 @@ __TLS_DIRECTIVE__
     reverse_proxy localhost:9000
 }
 __SENTRY_BLOCK_END__
+__SENTRY_PROXY_START__
+sentry.prakash.yral.com {
+__TLS_DIRECTIVE__
+    encode zstd gzip
+    reverse_proxy https://__SENTRY_SERVER_IP__ {
+        transport http {
+            tls_insecure_skip_verify
+        }
+    }
+}
+__SENTRY_PROXY_END__

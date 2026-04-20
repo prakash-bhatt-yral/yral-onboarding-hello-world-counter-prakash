@@ -36,13 +36,22 @@ else
 fi
 
 sentry_enabled="${SENTRY_ENABLED:-false}"
+sentry_server_ip="${SENTRY_SERVER_IP:-94.130.13.115}"
 
-# Replace __TLS_DIRECTIVE__ and optionally strip the sentry block
-awk -v tls_directive="${TLS_DIRECTIVE}" -v sentry_enabled="${sentry_enabled}" '
-  /__SENTRY_BLOCK_START__/ { skip = (sentry_enabled != "true"); next }
-  /__SENTRY_BLOCK_END__/   { skip = 0; next }
-  skip                     { next }
-  { gsub(/__TLS_DIRECTIVE__/, tls_directive); print }
+# Render: keep the direct block on the sentry server, the proxy block on all others
+awk -v tls_directive="${TLS_DIRECTIVE}" \
+    -v sentry_enabled="${sentry_enabled}" \
+    -v sentry_server_ip="${sentry_server_ip}" '
+  /__SENTRY_BLOCK_START__/  { skip = (sentry_enabled != "true"); next }
+  /__SENTRY_BLOCK_END__/    { skip = 0; next }
+  /__SENTRY_PROXY_START__/  { skip = (sentry_enabled == "true"); next }
+  /__SENTRY_PROXY_END__/    { skip = 0; next }
+  skip                      { next }
+  {
+    gsub(/__TLS_DIRECTIVE__/, tls_directive)
+    gsub(/__SENTRY_SERVER_IP__/, sentry_server_ip)
+    print
+  }
 ' "${TEMPLATE_PATH}" > "${OUTPUT_PATH}"
 
 echo "Rendered ${OUTPUT_PATH}"

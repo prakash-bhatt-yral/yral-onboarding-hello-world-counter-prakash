@@ -58,22 +58,33 @@ if INFRA_DIR="${TMP_DIR}/infra" \
   fail "expected failure when only cert is provided without key"
 fi
 
-# Test 4: SENTRY_ENABLED=false (default) — sentry block absent
-INFRA_DIR="${TMP_DIR}/infra" bash "${REPO_ROOT}/scripts/deploy/render-infra-caddyfile.sh"
-
-if grep -q 'sentry.prakash.yral.com' "${TMP_DIR}/infra/runtime/Caddyfile"; then
-  fail "sentry block should not appear when SENTRY_ENABLED is false"
-fi
-
-if grep -q '__SENTRY_BLOCK' "${TMP_DIR}/infra/runtime/Caddyfile"; then
-  fail "sentry block markers should not appear in rendered output"
-fi
-
-# Test 5: SENTRY_ENABLED=true — sentry block present
-INFRA_DIR="${TMP_DIR}/infra" SENTRY_ENABLED=true \
+# Test 4: SENTRY_ENABLED=false (default) — proxy block present, direct block absent
+INFRA_DIR="${TMP_DIR}/infra" SENTRY_SERVER_IP="94.130.13.115" \
   bash "${REPO_ROOT}/scripts/deploy/render-infra-caddyfile.sh"
 
 grep -q 'sentry.prakash.yral.com' "${TMP_DIR}/infra/runtime/Caddyfile" \
-  || fail "sentry block should appear when SENTRY_ENABLED=true"
+  || fail "sentry proxy block should appear when SENTRY_ENABLED is false"
+
+grep -q 'reverse_proxy https://94.130.13.115' "${TMP_DIR}/infra/runtime/Caddyfile" \
+  || fail "sentry proxy should point to SENTRY_SERVER_IP"
+
+if grep -q 'localhost:9000' "${TMP_DIR}/infra/runtime/Caddyfile"; then
+  fail "direct sentry block should not appear when SENTRY_ENABLED is false"
+fi
+
+if grep -q '__SENTRY_' "${TMP_DIR}/infra/runtime/Caddyfile"; then
+  fail "sentry markers should not appear in rendered output"
+fi
+
+# Test 5: SENTRY_ENABLED=true — direct block present, proxy block absent
+INFRA_DIR="${TMP_DIR}/infra" SENTRY_ENABLED=true \
+  bash "${REPO_ROOT}/scripts/deploy/render-infra-caddyfile.sh"
+
+grep -q 'localhost:9000' "${TMP_DIR}/infra/runtime/Caddyfile" \
+  || fail "direct sentry block should appear when SENTRY_ENABLED=true"
+
+if grep -q 'reverse_proxy https://' "${TMP_DIR}/infra/runtime/Caddyfile"; then
+  fail "proxy sentry block should not appear when SENTRY_ENABLED=true"
+fi
 
 echo "render-infra-caddyfile ok"
