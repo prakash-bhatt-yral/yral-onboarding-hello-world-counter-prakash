@@ -52,10 +52,18 @@ jobs:
             scp scripts/deploy/deploy-infra.sh scripts/deploy/render-infra-caddyfile.sh \
               "deploy@${NODE_IP}:${APP_DIR}/scripts/deploy/"
 
+            # Sentry runs only on server_1 — other nodes must not proxy localhost:9000
+            if [[ "${NODE_IP}" == "${SERVER_1_IP}" ]]; then
+              SENTRY_ENABLED=true
+            else
+              SENTRY_ENABLED=false
+            fi
+
             ssh "deploy@${NODE_IP}" \
               "export APP_DIR='${APP_DIR}'; \
                export INFRA_DIR='${APP_DIR}/infra'; \
                export CADDY_TLS_CERT_PEM_B64='${CADDY_TLS_CERT_PEM_B64}'; \
                export CADDY_TLS_KEY_PEM_B64='${CADDY_TLS_KEY_PEM_B64}'; \
+               export SENTRY_ENABLED='${SENTRY_ENABLED}'; \
                cd '${APP_DIR}' && bash scripts/deploy/deploy-infra.sh"
           done

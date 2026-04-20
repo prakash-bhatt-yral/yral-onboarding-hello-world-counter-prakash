@@ -35,9 +35,14 @@ else
   rm -f "${TLS_DIR}/tls.crt" "${TLS_DIR}/tls.key"
 fi
 
-# Replace every __TLS_DIRECTIVE__ occurrence — covers all site blocks in one pass
-awk -v tls_directive="${TLS_DIRECTIVE}" \
-  '{gsub(/__TLS_DIRECTIVE__/, tls_directive); print}' \
-  "${TEMPLATE_PATH}" > "${OUTPUT_PATH}"
+sentry_enabled="${SENTRY_ENABLED:-false}"
+
+# Replace __TLS_DIRECTIVE__ and optionally strip the sentry block
+awk -v tls_directive="${TLS_DIRECTIVE}" -v sentry_enabled="${sentry_enabled}" '
+  /__SENTRY_BLOCK_START__/ { skip = (sentry_enabled != "true"); next }
+  /__SENTRY_BLOCK_END__/   { skip = 0; next }
+  skip                     { next }
+  { gsub(/__TLS_DIRECTIVE__/, tls_directive); print }
+' "${TEMPLATE_PATH}" > "${OUTPUT_PATH}"
 
 echo "Rendered ${OUTPUT_PATH}"

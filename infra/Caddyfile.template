@@ -16,8 +16,10 @@ __TLS_DIRECTIVE__
     reverse_proxy localhost:3002
 }
 
+__SENTRY_BLOCK_START__
 sentry.prakash.yral.com {
 __TLS_DIRECTIVE__
     encode zstd gzip
     reverse_proxy localhost:9000
 }
+__SENTRY_BLOCK_END__
