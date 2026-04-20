@@ -1,0 +1,35 @@
+name: Restart Sentry
+
+on:
+  workflow_dispatch:
+
+env:
+  SERVER_1_IP: 94.130.13.115
+  SENTRY_DIR: /home/deploy/sentry
+
+jobs:
+  restart:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Restart Sentry containers on server_1
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ env.SERVER_1_IP }}
+          username: deploy
+          key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          script: |
+            cd "${{ env.SENTRY_DIR }}"
+            docker compose up -d
+            docker compose restart web
+            echo "Waiting for Sentry to become healthy..."
+            for i in $(seq 1 30); do
+              if curl -sf http://localhost:9000/_health/ > /dev/null 2>&1; then
+                echo "Sentry is healthy"
+                exit 0
+              fi
+              echo "  attempt $i/30 — waiting 10s..."
+              sleep 10
+            done
+            echo "ERROR: Sentry health check timed out"
+            docker compose logs --tail=50 web
+            exit 1
