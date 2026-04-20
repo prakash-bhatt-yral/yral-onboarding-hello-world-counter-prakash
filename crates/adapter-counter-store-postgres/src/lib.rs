@@ -3,6 +3,17 @@ use async_trait::async_trait;
 use thiserror::Error;
 use tokio_postgres::{Client, Connection, NoTls, Socket};
 
+const INIT_SQL: &str = "
+CREATE TABLE IF NOT EXISTS counters (
+    id INTEGER PRIMARY KEY,
+    value BIGINT NOT NULL
+    );
+    
+    INSERT INTO counters (id, value)
+    VALUES (1, 0)
+    ON CONFLICT (id) DO NOTHING;
+    ";
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PostgresCounterStoreConfig {
     pub connection_string: String,
@@ -19,18 +30,7 @@ impl PostgresCounterStore {
             .map_err(PostgresAdapterError::Connect)?;
 
         client
-            .batch_execute(
-                "
-                CREATE TABLE IF NOT EXISTS counters (
-                    id INTEGER PRIMARY KEY,
-                    value BIGINT NOT NULL
-                );
-
-                INSERT INTO counters (id, value)
-                VALUES (1, 0)
-                ON CONFLICT (id) DO NOTHING;
-                ",
-            )
+            .batch_execute(INIT_SQL)
             .await
             .map_err(PostgresAdapterError::Initialize)?;
 
@@ -90,6 +90,9 @@ impl CounterStore for PostgresCounterStore {
                     });
                 }
                 Err(e) if retries > 0 => {
+                    if let Ok(client) = self.client().await {
+                        let _ = client.batch_execute(INIT_SQL).await;
+                    }
                     tokio::time::sleep(delay).await;
                     retries -= 1;
                     delay *= 2;
