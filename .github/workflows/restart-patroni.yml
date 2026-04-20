@@ -1,0 +1,40 @@
+name: Restart Patroni
+
+on:
+  workflow_dispatch:
+    inputs:
+      node:
+        description: "Which node to restart patroni on (server_1, server_2, server_3, or all)"
+        required: true
+        default: "all"
+
+env:
+  APP_DIR: /home/deploy/yral-onboarding-hello-world-counter-prakash
+  SERVER_1_IP: 94.130.13.115
+  SERVER_2_IP: 88.99.151.102
+  SERVER_3_IP: 138.201.129.173
+
+jobs:
+  restart:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Restart Patroni
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+          declare -A SERVERS
+          SERVERS=([server_1]="${SERVER_1_IP}" [server_2]="${SERVER_2_IP}" [server_3]="${SERVER_3_IP}")
+
+          for NODE_NAME in "${!SERVERS[@]}"; do
+            NODE_IP="${SERVERS[$NODE_NAME]}"
+            if [[ "${{ inputs.node }}" != "all" && "${{ inputs.node }}" != "${NODE_NAME}" ]]; then
+              continue
+            fi
+
+            echo "--> Restarting patroni on ${NODE_NAME} (${NODE_IP})"
+            ssh-keyscan -H "${NODE_IP}" >> ~/.ssh/known_hosts 2>/dev/null || true
+            ssh "deploy@${NODE_IP}" \
+              "cd ${APP_DIR} && docker compose -f docker-compose.ha.yml restart patroni"
+          done

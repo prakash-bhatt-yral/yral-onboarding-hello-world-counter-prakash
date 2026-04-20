@@ -1,4 +1,17 @@
 services:
+  firewall:
+    image: alpine:3
+    privileged: true
+    network_mode: host
+    restart: always
+    environment:
+      SERVER_1_IP: "${SERVER_1_IP}"
+      SERVER_2_IP: "${SERVER_2_IP}"
+      SERVER_3_IP: "${SERVER_3_IP}"
+    volumes:
+      - ./scripts/server/apply-firewall.sh:/apply-firewall.sh:ro
+    command: sh /apply-firewall.sh
+
   etcd:
     image: gcr.io/etcd-development/etcd:v3.5.17
     environment:
