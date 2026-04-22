@@ -37,16 +37,20 @@ fi
 
 sentry_enabled="${SENTRY_ENABLED:-false}"
 sentry_server_ip="${SENTRY_SERVER_IP:-94.130.13.115}"
+nofeebooking_enabled="${NOFEEBOOKING_ENABLED:-false}"
 
-# Render: keep the direct block on the sentry server, the proxy block on all others
+# Render: conditionally include blocks based on server role
 awk -v tls_directive="${TLS_DIRECTIVE}" \
     -v sentry_enabled="${sentry_enabled}" \
-    -v sentry_server_ip="${sentry_server_ip}" '
-  /__SENTRY_BLOCK_START__/  { skip = (sentry_enabled != "true"); next }
-  /__SENTRY_BLOCK_END__/    { skip = 0; next }
-  /__SENTRY_PROXY_START__/  { skip = (sentry_enabled == "true"); next }
-  /__SENTRY_PROXY_END__/    { skip = 0; next }
-  skip                      { next }
+    -v sentry_server_ip="${sentry_server_ip}" \
+    -v nofeebooking_enabled="${nofeebooking_enabled}" '
+  /__SENTRY_BLOCK_START__/      { skip = (sentry_enabled != "true"); next }
+  /__SENTRY_BLOCK_END__/        { skip = 0; next }
+  /__SENTRY_PROXY_START__/      { skip = (sentry_enabled == "true"); next }
+  /__SENTRY_PROXY_END__/        { skip = 0; next }
+  /__NOFEEBOOKING_BLOCK_START__/{ skip = (nofeebooking_enabled != "true"); next }
+  /__NOFEEBOOKING_BLOCK_END__/  { skip = 0; next }
+  skip                          { next }
   {
     gsub(/__TLS_DIRECTIVE__/, tls_directive)
     gsub(/__SENTRY_SERVER_IP__/, sentry_server_ip)

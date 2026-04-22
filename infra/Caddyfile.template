@@ -16,6 +16,7 @@ __TLS_DIRECTIVE__
     reverse_proxy localhost:3002
 }
 
+__NOFEEBOOKING_BLOCK_START__
 nofeebooking.com {
     encode zstd gzip
     reverse_proxy localhost:3003
@@ -24,6 +25,7 @@ nofeebooking.com {
 www.nofeebooking.com {
     redir https://nofeebooking.com{uri} permanent
 }
+__NOFEEBOOKING_BLOCK_END__
 
 nofeebooking.prakash.yral.com {
 __TLS_DIRECTIVE__

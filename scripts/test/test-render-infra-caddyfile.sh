@@ -87,4 +87,25 @@ if grep -q 'reverse_proxy 94\.130\.13\.115:9000' "${TMP_DIR}/infra/runtime/Caddy
   fail "proxy sentry block should not appear when SENTRY_ENABLED=true"
 fi
 
+# Test 6: NOFEEBOOKING_ENABLED=false (default) — nofeebooking blocks absent
+INFRA_DIR="${TMP_DIR}/infra" bash "${REPO_ROOT}/scripts/deploy/render-infra-caddyfile.sh"
+
+if grep -q 'reverse_proxy localhost:3003' "${TMP_DIR}/infra/runtime/Caddyfile"; then
+  fail "nofeebooking.com block should not appear when NOFEEBOOKING_ENABLED is false"
+fi
+
+if grep -q '__NOFEEBOOKING_' "${TMP_DIR}/infra/runtime/Caddyfile"; then
+  fail "nofeebooking markers should not appear in rendered output"
+fi
+
+# Test 7: NOFEEBOOKING_ENABLED=true — nofeebooking blocks present
+INFRA_DIR="${TMP_DIR}/infra" NOFEEBOOKING_ENABLED=true \
+  bash "${REPO_ROOT}/scripts/deploy/render-infra-caddyfile.sh"
+
+grep -q 'nofeebooking.com' "${TMP_DIR}/infra/runtime/Caddyfile" \
+  || fail "nofeebooking.com block should appear when NOFEEBOOKING_ENABLED=true"
+
+grep -q 'reverse_proxy localhost:3003' "${TMP_DIR}/infra/runtime/Caddyfile" \
+  || fail "nofeebooking.com should reverse proxy to localhost:3003"
+
 echo "render-infra-caddyfile ok"
