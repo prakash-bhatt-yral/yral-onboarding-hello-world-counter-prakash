@@ -26,6 +26,15 @@ www.nofeebooking.com {
     redir https://nofeebooking.com{uri} permanent
 }
 __NOFEEBOOKING_BLOCK_END__
+__NOFEEBOOKING_PROXY_START__
+http://nofeebooking.com {
+    reverse_proxy __NOFEEBOOKING_SERVER_IP__:80
+}
+
+http://www.nofeebooking.com {
+    reverse_proxy __NOFEEBOOKING_SERVER_IP__:80
+}
+__NOFEEBOOKING_PROXY_END__
 
 nofeebooking.prakash.yral.com {
 __TLS_DIRECTIVE__

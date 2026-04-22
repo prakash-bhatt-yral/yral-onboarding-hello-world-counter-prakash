@@ -68,5 +68,6 @@ jobs:
                export CADDY_TLS_KEY_PEM_B64='${CADDY_TLS_KEY_PEM_B64}'; \
                export SENTRY_ENABLED='${SENTRY_ENABLED}'; \
                export NOFEEBOOKING_ENABLED='${NOFEEBOOKING_ENABLED}'; \
+               export NOFEEBOOKING_SERVER_IP='${SERVER_1_IP}'; \
                cd '${APP_DIR}' && bash scripts/deploy/deploy-infra.sh"
           done

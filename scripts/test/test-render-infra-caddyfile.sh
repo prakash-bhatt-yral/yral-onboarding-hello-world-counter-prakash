@@ -87,18 +87,25 @@ if grep -q 'reverse_proxy 94\.130\.13\.115:9000' "${TMP_DIR}/infra/runtime/Caddy
   fail "proxy sentry block should not appear when SENTRY_ENABLED=true"
 fi
 
-# Test 6: NOFEEBOOKING_ENABLED=false (default) — nofeebooking blocks absent
-INFRA_DIR="${TMP_DIR}/infra" bash "${REPO_ROOT}/scripts/deploy/render-infra-caddyfile.sh"
+# Test 6: NOFEEBOOKING_ENABLED=false (default) — direct block absent, HTTP proxy block present
+INFRA_DIR="${TMP_DIR}/infra" NOFEEBOOKING_SERVER_IP="94.130.13.115" \
+  bash "${REPO_ROOT}/scripts/deploy/render-infra-caddyfile.sh"
 
 if grep -q 'reverse_proxy localhost:3003' "${TMP_DIR}/infra/runtime/Caddyfile"; then
-  fail "nofeebooking.com block should not appear when NOFEEBOOKING_ENABLED is false"
+  fail "nofeebooking.com direct block should not appear when NOFEEBOOKING_ENABLED is false"
 fi
+
+grep -q 'reverse_proxy 94.130.13.115:80' "${TMP_DIR}/infra/runtime/Caddyfile" \
+  || fail "nofeebooking HTTP proxy block should appear on non-primary nodes"
+
+grep -q 'http://nofeebooking.com' "${TMP_DIR}/infra/runtime/Caddyfile" \
+  || fail "nofeebooking HTTP proxy site block should be present"
 
 if grep -q '__NOFEEBOOKING_' "${TMP_DIR}/infra/runtime/Caddyfile"; then
   fail "nofeebooking markers should not appear in rendered output"
 fi
 
-# Test 7: NOFEEBOOKING_ENABLED=true — nofeebooking blocks present
+# Test 7: NOFEEBOOKING_ENABLED=true — direct block present, HTTP proxy block absent
 INFRA_DIR="${TMP_DIR}/infra" NOFEEBOOKING_ENABLED=true \
   bash "${REPO_ROOT}/scripts/deploy/render-infra-caddyfile.sh"
 
@@ -107,5 +114,9 @@ grep -q 'nofeebooking.com' "${TMP_DIR}/infra/runtime/Caddyfile" \
 
 grep -q 'reverse_proxy localhost:3003' "${TMP_DIR}/infra/runtime/Caddyfile" \
   || fail "nofeebooking.com should reverse proxy to localhost:3003"
+
+if grep -q 'reverse_proxy 94\.130\.13\.115:80' "${TMP_DIR}/infra/runtime/Caddyfile"; then
+  fail "HTTP proxy block should not appear when NOFEEBOOKING_ENABLED=true"
+fi
 
 echo "render-infra-caddyfile ok"
