@@ -1,0 +1,69 @@
+name: Renew nofeebooking.com Cert
+
+on:
+  schedule:
+    # Run on the 1st of every month — cert is valid 90 days, this renews well before expiry
+    - cron: '0 3 1 * *'
+  workflow_dispatch:
+
+# Never cancel an in-progress renewal — a partial update leaves stale certs
+concurrency:
+  group: renew-nofeebooking-cert
+  cancel-in-progress: false
+
+env:
+  SERVER_1_IP: 94.130.13.115
+
+jobs:
+  renew-cert:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Extract cert from server_1 and update secrets
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "${SERVER_1_IP}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+          # Force Caddy to renew the cert if it's within 30 days of expiry
+          ssh "deploy@${SERVER_1_IP}" \
+            "docker exec infra-caddy-1 caddy renew --force 2>/dev/null || true"
+
+          # Extract cert and key from caddy_data volume
+          CERT_B64=$(ssh "deploy@${SERVER_1_IP}" \
+            "docker exec infra-caddy-1 cat \
+              /data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/nofeebooking.com/nofeebooking.com.crt \
+              | base64 | tr -d '\n'")
+
+          KEY_B64=$(ssh "deploy@${SERVER_1_IP}" \
+            "docker exec infra-caddy-1 cat \
+              /data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/nofeebooking.com/nofeebooking.com.key \
+              | base64 | tr -d '\n'")
+
+          echo "CERT_B64=${CERT_B64}" >> "${GITHUB_ENV}"
+          echo "KEY_B64=${KEY_B64}" >> "${GITHUB_ENV}"
+
+      - name: Update GitHub secrets
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT_SECRETS_WRITE }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh secret set NOFEEBOOKING_TLS_CERT_PEM_B64 \
+            --body "${CERT_B64}" \
+            --repo "${REPO}"
+
+          gh secret set NOFEEBOOKING_TLS_KEY_PEM_B64 \
+            --body "${KEY_B64}" \
+            --repo "${REPO}"
+
+          echo "Secrets updated — triggering infra deploy to distribute new cert"
+
+      - name: Trigger infra deploy
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT_SECRETS_WRITE }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh workflow run deploy-infra.yml --repo "${REPO}"

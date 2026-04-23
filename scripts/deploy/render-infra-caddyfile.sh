@@ -35,17 +35,33 @@ else
   rm -f "${TLS_DIR}/tls.crt" "${TLS_DIR}/tls.key"
 fi
 
+NOFEEBOOKING_TLS_DIRECTIVE=""
+
+if [[ -n "${NOFEEBOOKING_TLS_CERT_PEM_B64:-}" && -n "${NOFEEBOOKING_TLS_KEY_PEM_B64:-}" ]]; then
+  printf '%s' "${NOFEEBOOKING_TLS_CERT_PEM_B64}" | base64 --decode > "${TLS_DIR}/nofeebooking.crt"
+  printf '%s' "${NOFEEBOOKING_TLS_KEY_PEM_B64}" | base64 --decode > "${TLS_DIR}/nofeebooking.key"
+  chmod 600 "${TLS_DIR}/nofeebooking.crt" "${TLS_DIR}/nofeebooking.key"
+  NOFEEBOOKING_TLS_DIRECTIVE="    tls /etc/caddy/tls/nofeebooking.crt /etc/caddy/tls/nofeebooking.key"
+else
+  rm -f "${TLS_DIR}/nofeebooking.crt" "${TLS_DIR}/nofeebooking.key"
+fi
+
 sentry_enabled="${SENTRY_ENABLED:-false}"
 sentry_server_ip="${SENTRY_SERVER_IP:-94.130.13.115}"
 nofeebooking_enabled="${NOFEEBOOKING_ENABLED:-false}"
 nofeebooking_server_ip="${NOFEEBOOKING_SERVER_IP:-94.130.13.115}"
+nofeebooking_backend_2="${NOFEEBOOKING_BACKEND_2:-88.99.151.102}"
+nofeebooking_backend_3="${NOFEEBOOKING_BACKEND_3:-138.201.129.173}"
 
 # Render: conditionally include blocks based on server role
 awk -v tls_directive="${TLS_DIRECTIVE}" \
+    -v nofeebooking_tls_directive="${NOFEEBOOKING_TLS_DIRECTIVE}" \
     -v sentry_enabled="${sentry_enabled}" \
     -v sentry_server_ip="${sentry_server_ip}" \
     -v nofeebooking_enabled="${nofeebooking_enabled}" \
-    -v nofeebooking_server_ip="${nofeebooking_server_ip}" '
+    -v nofeebooking_server_ip="${nofeebooking_server_ip}" \
+    -v nofeebooking_backend_2="${nofeebooking_backend_2}" \
+    -v nofeebooking_backend_3="${nofeebooking_backend_3}" '
   /__SENTRY_BLOCK_START__/         { skip = (sentry_enabled != "true"); next }
   /__SENTRY_BLOCK_END__/           { skip = 0; next }
   /__SENTRY_PROXY_START__/         { skip = (sentry_enabled == "true"); next }
@@ -57,8 +73,11 @@ awk -v tls_directive="${TLS_DIRECTIVE}" \
   skip                             { next }
   {
     gsub(/__TLS_DIRECTIVE__/, tls_directive)
+    gsub(/__NOFEEBOOKING_TLS_DIRECTIVE__/, nofeebooking_tls_directive)
     gsub(/__SENTRY_SERVER_IP__/, sentry_server_ip)
     gsub(/__NOFEEBOOKING_SERVER_IP__/, nofeebooking_server_ip)
+    gsub(/__NOFEEBOOKING_BACKEND_2__/, nofeebooking_backend_2)
+    gsub(/__NOFEEBOOKING_BACKEND_3__/, nofeebooking_backend_3)
     print
   }
 ' "${TEMPLATE_PATH}" > "${OUTPUT_PATH}"

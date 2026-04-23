@@ -105,15 +105,28 @@ if grep -q '__NOFEEBOOKING_' "${TMP_DIR}/infra/runtime/Caddyfile"; then
   fail "nofeebooking markers should not appear in rendered output"
 fi
 
-# Test 7: NOFEEBOOKING_ENABLED=true — direct block present, HTTP proxy block absent
+# Test 7: NOFEEBOOKING_ENABLED=true — direct block present, TLS directive injected, HTTP proxy absent
+NOFEEBOOKING_CERT_PEM=$'-----BEGIN CERTIFICATE-----\nnofeebooking-cert\n-----END CERTIFICATE-----\n'
+NOFEEBOOKING_KEY_PEM=$'-----BEGIN PRIVATE KEY-----\nnofeebooking-key\n-----END PRIVATE KEY-----\n'
+
 INFRA_DIR="${TMP_DIR}/infra" NOFEEBOOKING_ENABLED=true \
+  NOFEEBOOKING_TLS_CERT_PEM_B64="$(printf '%s' "${NOFEEBOOKING_CERT_PEM}" | base64 | tr -d '\n')" \
+  NOFEEBOOKING_TLS_KEY_PEM_B64="$(printf '%s' "${NOFEEBOOKING_KEY_PEM}" | base64 | tr -d '\n')" \
   bash "${REPO_ROOT}/scripts/deploy/render-infra-caddyfile.sh"
 
 grep -q 'nofeebooking.com' "${TMP_DIR}/infra/runtime/Caddyfile" \
   || fail "nofeebooking.com block should appear when NOFEEBOOKING_ENABLED=true"
 
 grep -q 'reverse_proxy localhost:3003' "${TMP_DIR}/infra/runtime/Caddyfile" \
-  || fail "nofeebooking.com should reverse proxy to localhost:3003"
+  || fail "nofeebooking.com should proxy to localhost:3003"
+
+grep -q 'tls /etc/caddy/tls/nofeebooking.crt /etc/caddy/tls/nofeebooking.key' \
+  "${TMP_DIR}/infra/runtime/Caddyfile" \
+  || fail "nofeebooking TLS directive should be injected when cert+key provided"
+
+if grep -q '__NOFEEBOOKING_TLS_DIRECTIVE__' "${TMP_DIR}/infra/runtime/Caddyfile"; then
+  fail "NOFEEBOOKING_TLS_DIRECTIVE placeholder was not substituted"
+fi
 
 if grep -q 'reverse_proxy 94\.130\.13\.115:80' "${TMP_DIR}/infra/runtime/Caddyfile"; then
   fail "HTTP proxy block should not appear when NOFEEBOOKING_ENABLED=true"
