@@ -17,22 +17,12 @@ __TLS_DIRECTIVE__
 }
 
 __NOFEEBOOKING_BLOCK_START__
-nofeebooking.com {
-    tls {
-        issuer acme {
-            disable_tlsalpn_challenge
-        }
-    }
+http://nofeebooking.com {
     encode zstd gzip
     reverse_proxy localhost:3003
 }
 
-www.nofeebooking.com {
-    tls {
-        issuer acme {
-            disable_tlsalpn_challenge
-        }
-    }
+http://www.nofeebooking.com {
     redir https://nofeebooking.com{uri} permanent
 }
 __NOFEEBOOKING_BLOCK_END__
