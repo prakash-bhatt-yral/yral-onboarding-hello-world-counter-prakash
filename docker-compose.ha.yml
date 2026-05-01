@@ -10,7 +10,7 @@ services:
       SERVER_3_IP: "${SERVER_3_IP}"
     volumes:
       - ./scripts/server/apply-firewall.sh:/apply-firewall.sh:ro
-    command: sh /apply-firewall.sh
+    command: sh -c "apk add --no-cache iptables ip6tables && sh /apply-firewall.sh"
 
   etcd:
     image: gcr.io/etcd-development/etcd:v3.5.17
