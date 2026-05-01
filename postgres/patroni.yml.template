@@ -50,3 +50,4 @@ postgresql:
     - host all all 0.0.0.0/0 md5
   parameters:
     shared_buffers: "128MB"
+    password_encryption: "md5"
