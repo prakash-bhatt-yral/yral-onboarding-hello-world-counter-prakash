@@ -16,6 +16,18 @@ __TLS_DIRECTIVE__
     reverse_proxy localhost:3002
 }
 
+storj-interface.yral.com {
+__TLS_DIRECTIVE__
+    encode zstd gzip
+    reverse_proxy localhost:3004
+}
+
+storj-interface-preview.prakash.yral.com {
+__TLS_DIRECTIVE__
+    encode zstd gzip
+    reverse_proxy localhost:3005
+}
+
 __NOFEEBOOKING_BLOCK_START__
 nofeebooking.com {
 __NOFEEBOOKING_TLS_DIRECTIVE__
