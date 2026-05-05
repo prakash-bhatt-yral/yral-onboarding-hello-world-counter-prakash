@@ -52,6 +52,8 @@ nofeebooking_enabled="${NOFEEBOOKING_ENABLED:-false}"
 nofeebooking_server_ip="${NOFEEBOOKING_SERVER_IP:-94.130.13.115}"
 nofeebooking_backend_2="${NOFEEBOOKING_BACKEND_2:-88.99.151.102}"
 nofeebooking_backend_3="${NOFEEBOOKING_BACKEND_3:-138.201.129.173}"
+storj_enabled="${STORJ_ENABLED:-false}"
+storj_server_ip="${STORJ_SERVER_IP:-94.130.13.115}"
 
 # Render: conditionally include blocks based on server role
 awk -v tls_directive="${TLS_DIRECTIVE}" \
@@ -61,7 +63,9 @@ awk -v tls_directive="${TLS_DIRECTIVE}" \
     -v nofeebooking_enabled="${nofeebooking_enabled}" \
     -v nofeebooking_server_ip="${nofeebooking_server_ip}" \
     -v nofeebooking_backend_2="${nofeebooking_backend_2}" \
-    -v nofeebooking_backend_3="${nofeebooking_backend_3}" '
+    -v nofeebooking_backend_3="${nofeebooking_backend_3}" \
+    -v storj_enabled="${storj_enabled}" \
+    -v storj_server_ip="${storj_server_ip}" '
   /__SENTRY_BLOCK_START__/         { skip = (sentry_enabled != "true"); next }
   /__SENTRY_BLOCK_END__/           { skip = 0; next }
   /__SENTRY_PROXY_START__/         { skip = (sentry_enabled == "true"); next }
@@ -70,6 +74,10 @@ awk -v tls_directive="${TLS_DIRECTIVE}" \
   /__NOFEEBOOKING_BLOCK_END__/     { skip = 0; next }
   /__NOFEEBOOKING_PROXY_START__/   { skip = (nofeebooking_enabled == "true"); next }
   /__NOFEEBOOKING_PROXY_END__/     { skip = 0; next }
+  /__STORJ_BLOCK_START__/          { skip = (storj_enabled != "true"); next }
+  /__STORJ_BLOCK_END__/            { skip = 0; next }
+  /__STORJ_PROXY_START__/          { skip = (storj_enabled == "true"); next }
+  /__STORJ_PROXY_END__/            { skip = 0; next }
   skip                             { next }
   {
     gsub(/__TLS_DIRECTIVE__/, tls_directive)
@@ -78,6 +86,7 @@ awk -v tls_directive="${TLS_DIRECTIVE}" \
     gsub(/__NOFEEBOOKING_SERVER_IP__/, nofeebooking_server_ip)
     gsub(/__NOFEEBOOKING_BACKEND_2__/, nofeebooking_backend_2)
     gsub(/__NOFEEBOOKING_BACKEND_3__/, nofeebooking_backend_3)
+    gsub(/__STORJ_SERVER_IP__/, storj_server_ip)
     print
   }
 ' "${TEMPLATE_PATH}" > "${OUTPUT_PATH}"

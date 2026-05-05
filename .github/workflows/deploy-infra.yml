@@ -54,11 +54,13 @@ jobs:
             scp scripts/deploy/deploy-infra.sh scripts/deploy/render-infra-caddyfile.sh \
               "deploy@${NODE_IP}:${APP_DIR}/scripts/deploy/"
 
-            # Sentry only on server_1; nofeebooking.com on all servers
+            # Sentry and storj-interface only on server_1; nofeebooking.com on all servers
             if [[ "${NODE_IP}" == "${SERVER_1_IP}" ]]; then
               SENTRY_ENABLED=true
+              STORJ_ENABLED=true
             else
               SENTRY_ENABLED=false
+              STORJ_ENABLED=false
             fi
             NOFEEBOOKING_ENABLED=true
 
@@ -74,5 +76,7 @@ jobs:
                export NOFEEBOOKING_SERVER_IP='${SERVER_1_IP}'; \
                export NOFEEBOOKING_BACKEND_2='${SERVER_2_IP}'; \
                export NOFEEBOOKING_BACKEND_3='${SERVER_3_IP}'; \
+               export STORJ_ENABLED='${STORJ_ENABLED}'; \
+               export STORJ_SERVER_IP='${SERVER_1_IP}'; \
                cd '${APP_DIR}' && bash scripts/deploy/deploy-infra.sh"
           done
