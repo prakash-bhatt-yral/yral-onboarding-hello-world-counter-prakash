@@ -23,7 +23,7 @@ __TLS_DIRECTIVE__
     reverse_proxy localhost:3004
 }
 
-storj-interface-preview.prakash.yral.com {
+storage-interface.prakash.yral.com {
 __TLS_DIRECTIVE__
     encode zstd gzip
     reverse_proxy localhost:3005
@@ -36,7 +36,7 @@ __TLS_DIRECTIVE__
     reverse_proxy __STORJ_SERVER_IP__:3004
 }
 
-storj-interface-preview.prakash.yral.com {
+storage-interface.prakash.yral.com {
 __TLS_DIRECTIVE__
     encode zstd gzip
     reverse_proxy __STORJ_SERVER_IP__:3005

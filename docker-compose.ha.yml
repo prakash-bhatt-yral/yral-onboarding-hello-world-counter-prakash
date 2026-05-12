@@ -14,6 +14,9 @@ services:
 
   etcd:
     image: gcr.io/etcd-development/etcd:v3.5.17
+    depends_on:
+      firewall:
+        condition: service_started
     environment:
       ETCD_NAME: "${NODE_NAME}"
       ETCD_DATA_DIR: "/etcd-data"
@@ -33,6 +36,13 @@ services:
     volumes:
       - etcd_data:/etcd-data
     restart: always
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/etcdctl", "endpoint", "health",
+             "--endpoints=http://localhost:2379"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
 
   patroni:
     build:
@@ -52,11 +62,12 @@ services:
       - "8008:8008"
       - "5432:5432"
     depends_on:
-      - etcd
+      etcd:
+        condition: service_healthy
     restart: always
 
   pgbouncer:
-    image: edoburu/pgbouncer:latest
+    image: edoburu/pgbouncer:1.23.1
     environment:
       DB_HOST: postgres-router
       DB_PORT: 5432
@@ -64,9 +75,16 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD:-counter}
       POOL_MODE: transaction
       IGNORE_STARTUP_PARAMETERS: extra_float_digits
+      SERVER_RESET_QUERY: DISCARD ALL
       LISTEN_PORT: 6432
     depends_on:
       - postgres-router
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 6432 -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 15s
     restart: always
 
   postgres-router:
@@ -89,7 +107,8 @@ services:
       RUST_LOG: "${RUST_LOG:-info}"
       SENTRY_DSN: "${SENTRY_DSN:-}"
     depends_on:
-      - pgbouncer
+      pgbouncer:
+        condition: service_healthy
     # Publish on host port 3001 so the shared infra Caddy can reach this app
     # via localhost:3001. Each project on these servers uses a unique 300x port.
     ports:

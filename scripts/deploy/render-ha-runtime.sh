@@ -5,9 +5,13 @@ APP_DIR="${APP_DIR:-$(pwd)}"
 RUNTIME_DIR="${APP_DIR}/runtime"
 HAPROXY_TEMPLATE_PATH="${APP_DIR}/haproxy/haproxy-ha.cfg.template"
 
-SERVER_1_IP="${SERVER_1_IP:-127.0.0.1}"
-SERVER_2_IP="${SERVER_2_IP:-127.0.0.2}"
-SERVER_3_IP="${SERVER_3_IP:-127.0.0.3}"
+SERVER_1_IP="${SERVER_1_IP:-}"
+SERVER_2_IP="${SERVER_2_IP:-}"
+SERVER_3_IP="${SERVER_3_IP:-}"
+
+for var in SERVER_1_IP SERVER_2_IP SERVER_3_IP; do
+  [[ -n "${!var}" ]] || { echo "error: ${var} is empty" >&2; exit 1; }
+done
 
 mkdir -p "${RUNTIME_DIR}"
 

@@ -23,7 +23,8 @@ bash scripts/deploy/render-ha-runtime.sh
 # Detect whether etcd has already been bootstrapped on this node.
 # The official etcd image is distroless (no shell), so detection must happen
 # here on the host by inspecting the named volume via a throwaway alpine container.
-PROJECT_NAME="$(basename "${APP_DIR}")"
+PROJECT_NAME="${COMPOSE_PROJECT_NAME:-$(basename "${APP_DIR}")}"
+export COMPOSE_PROJECT_NAME="${PROJECT_NAME}"
 if docker run --rm \
      -v "${PROJECT_NAME}_etcd_data:/data" \
      alpine:3 \

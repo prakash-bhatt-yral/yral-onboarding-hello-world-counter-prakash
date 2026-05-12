@@ -29,15 +29,20 @@ bootstrap:
     - encoding: UTF8
     - data-checksums
   pg_hba:
-    - host replication replicator 0.0.0.0/0 trust
-    - host all all 0.0.0.0/0 md5
+    - host replication replicator 0.0.0.0/0 scram-sha-256
+    - host all all 0.0.0.0/0 scram-sha-256
+  users:
+    replicator:
+      password: "${POSTGRES_PASSWORD}"
+      options:
+        - replication
 
 postgresql:
   listen: "0.0.0.0:5432"
   connect_address: "${APP_HOST}:5432"
   data_dir: "/var/lib/postgresql/data"
   bin_dir: "/usr/local/bin"
-  pgpass: "/tmp/pgpass"
+  pgpass: "/var/lib/postgresql/.pgpass"
   authentication:
     replication:
       username: "replicator"
@@ -46,8 +51,8 @@ postgresql:
       username: "${POSTGRES_USER}"
       password: "${POSTGRES_PASSWORD}"
   pg_hba:
-    - host replication replicator 0.0.0.0/0 trust
-    - host all all 0.0.0.0/0 md5
+    - host replication replicator 0.0.0.0/0 scram-sha-256
+    - host all all 0.0.0.0/0 scram-sha-256
   parameters:
     shared_buffers: "128MB"
-    password_encryption: "md5"
+    password_encryption: "scram-sha-256"
