@@ -36,14 +36,8 @@ else
 fi
 
 NOFEEBOOKING_TLS_DIRECTIVE=""
-nofeebooking_tls_source_host="${NOFEEBOOKING_TLS_SOURCE_HOST:-false}"
 
-# The TLS-source host (the one instance whose Caddy actually renews the cert
-# via ACME) must never be pinned to a static file, or it stops self-renewing
-# and there is nothing left for the renewal workflow to harvest.
-if [[ "${nofeebooking_tls_source_host}" == "true" ]]; then
-  rm -f "${TLS_DIR}/nofeebooking.crt" "${TLS_DIR}/nofeebooking.key"
-elif [[ -n "${NOFEEBOOKING_TLS_CERT_PEM_B64:-}" && -n "${NOFEEBOOKING_TLS_KEY_PEM_B64:-}" ]]; then
+if [[ -n "${NOFEEBOOKING_TLS_CERT_PEM_B64:-}" && -n "${NOFEEBOOKING_TLS_KEY_PEM_B64:-}" ]]; then
   printf '%s' "${NOFEEBOOKING_TLS_CERT_PEM_B64}" | base64 --decode > "${TLS_DIR}/nofeebooking.crt"
   printf '%s' "${NOFEEBOOKING_TLS_KEY_PEM_B64}" | base64 --decode > "${TLS_DIR}/nofeebooking.key"
   chmod 600 "${TLS_DIR}/nofeebooking.crt" "${TLS_DIR}/nofeebooking.key"

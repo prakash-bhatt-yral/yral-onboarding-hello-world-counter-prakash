@@ -132,24 +132,4 @@ if grep -q 'reverse_proxy 94\.130\.13\.115:80' "${TMP_DIR}/infra/runtime/Caddyfi
   fail "HTTP proxy block should not appear when NOFEEBOOKING_ENABLED=true"
 fi
 
-# Test 8: NOFEEBOOKING_TLS_SOURCE_HOST=true — no static TLS directive even with
-# cert+key provided, so this host stays on Caddy's automatic HTTPS and keeps
-# renewing via ACME instead of being pinned to the harvested file.
-INFRA_DIR="${TMP_DIR}/infra" NOFEEBOOKING_ENABLED=true NOFEEBOOKING_TLS_SOURCE_HOST=true \
-  NOFEEBOOKING_TLS_CERT_PEM_B64="$(printf '%s' "${NOFEEBOOKING_CERT_PEM}" | base64 | tr -d '\n')" \
-  NOFEEBOOKING_TLS_KEY_PEM_B64="$(printf '%s' "${NOFEEBOOKING_KEY_PEM}" | base64 | tr -d '\n')" \
-  bash "${REPO_ROOT}/scripts/deploy/render-infra-caddyfile.sh"
-
-if grep -q 'tls /etc/caddy/tls/nofeebooking.crt' "${TMP_DIR}/infra/runtime/Caddyfile"; then
-  fail "TLS-source host should not receive the static nofeebooking TLS directive"
-fi
-
-[[ ! -e "${TMP_DIR}/infra/runtime/tls/nofeebooking.crt" ]] \
-  || fail "TLS-source host should not have nofeebooking.crt written to disk"
-[[ ! -e "${TMP_DIR}/infra/runtime/tls/nofeebooking.key" ]] \
-  || fail "TLS-source host should not have nofeebooking.key written to disk"
-
-grep -q 'nofeebooking.com, www.nofeebooking.com {' "${TMP_DIR}/infra/runtime/Caddyfile" \
-  || fail "nofeebooking.com and www.nofeebooking.com should share a single site block"
-
 echo "render-infra-caddyfile ok"
