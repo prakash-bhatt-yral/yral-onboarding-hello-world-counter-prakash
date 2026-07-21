@@ -28,20 +28,42 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H "${SERVER_1_IP}" >> ~/.ssh/known_hosts 2>/dev/null || true
 
-          # Force Caddy to renew the cert if it's within 30 days of expiry
-          ssh "deploy@${SERVER_1_IP}" \
-            "docker exec infra-caddy-1 caddy renew --force 2>/dev/null || true"
+          CERT_PATH="/data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/nofeebooking.com/nofeebooking.com.crt"
+          KEY_PATH="/data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/nofeebooking.com/nofeebooking.com.key"
+
+          get_not_before() {
+            ssh "deploy@${SERVER_1_IP}" "docker exec infra-caddy-1 cat ${CERT_PATH} 2>/dev/null" \
+              | openssl x509 -noout -startdate 2>/dev/null | cut -d= -f2 || true
+          }
+
+          BEFORE="$(get_not_before)"
+          echo "Cert notBefore prior to renewal attempt: ${BEFORE:-<none>}"
+
+          # DNS round-robins nofeebooking.com across server_1/2/3, so any single
+          # HTTP-01 challenge only has ~1-in-3 odds of landing on server_1. Retry
+          # instead of treating one failed attempt as authoritative.
+          RENEWED=false
+          for attempt in 1 2 3 4 5; do
+            echo "Renewal attempt ${attempt}/5"
+            ssh "deploy@${SERVER_1_IP}" "docker exec infra-caddy-1 caddy renew --force" || true
+
+            AFTER="$(get_not_before)"
+            if [[ -n "${AFTER}" && "${AFTER}" != "${BEFORE}" ]]; then
+              echo "Cert renewed: ${AFTER}"
+              RENEWED=true
+              break
+            fi
+            sleep 30
+          done
+
+          if [[ "${RENEWED}" != "true" ]]; then
+            echo "::error::nofeebooking.com cert was not renewed after 5 attempts — HTTP-01 challenge likely failed to land on server_1 (DNS round-robins across 3 servers). Leaving secrets untouched; will retry next scheduled run."
+            exit 1
+          fi
 
           # Extract cert and key from caddy_data volume
-          CERT_B64=$(ssh "deploy@${SERVER_1_IP}" \
-            "docker exec infra-caddy-1 cat \
-              /data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/nofeebooking.com/nofeebooking.com.crt \
-              | base64 | tr -d '\n'")
-
-          KEY_B64=$(ssh "deploy@${SERVER_1_IP}" \
-            "docker exec infra-caddy-1 cat \
-              /data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/nofeebooking.com/nofeebooking.com.key \
-              | base64 | tr -d '\n'")
+          CERT_B64=$(ssh "deploy@${SERVER_1_IP}" "docker exec infra-caddy-1 cat ${CERT_PATH} | base64 | tr -d '\n'")
+          KEY_B64=$(ssh "deploy@${SERVER_1_IP}" "docker exec infra-caddy-1 cat ${KEY_PATH} | base64 | tr -d '\n'")
 
           echo "CERT_B64=${CERT_B64}" >> "${GITHUB_ENV}"
           echo "KEY_B64=${KEY_B64}" >> "${GITHUB_ENV}"

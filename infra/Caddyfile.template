@@ -44,15 +44,13 @@ __TLS_DIRECTIVE__
 __STORJ_PROXY_END__
 
 __NOFEEBOOKING_BLOCK_START__
-nofeebooking.com {
+nofeebooking.com, www.nofeebooking.com {
 __NOFEEBOOKING_TLS_DIRECTIVE__
+    @www host www.nofeebooking.com
+    redir @www https://nofeebooking.com{uri} permanent
+
     encode zstd gzip
     reverse_proxy localhost:3003
-}
-
-www.nofeebooking.com {
-__NOFEEBOOKING_TLS_DIRECTIVE__
-    redir https://nofeebooking.com{uri} permanent
 }
 __NOFEEBOOKING_BLOCK_END__
 __NOFEEBOOKING_PROXY_START__
