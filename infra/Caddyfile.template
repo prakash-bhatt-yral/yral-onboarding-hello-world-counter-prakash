@@ -44,17 +44,40 @@ __TLS_DIRECTIVE__
 __STORJ_PROXY_END__
 
 __NOFEEBOOKING_BLOCK_START__
-nofeebooking.com {
+nofeebooking.com, www.nofeebooking.com {
+    tls {
+        issuer acme {
+            disable_tlsalpn_challenge
+        }
+    }
+    @www host www.nofeebooking.com
+    redir @www https://nofeebooking.com{uri} permanent
+
+    encode zstd gzip
+    reverse_proxy localhost:3003
+}
+__NOFEEBOOKING_BLOCK_END__
+__NOFEEBOOKING_STATIC_START__
+nofeebooking.com:80, www.nofeebooking.com:80 {
+    handle /.well-known/acme-challenge/* {
+        reverse_proxy __NOFEEBOOKING_SERVER_IP__:80
+    }
+    handle {
+        redir https://{host}{uri} permanent
+    }
+}
+
+nofeebooking.com:443 {
 __NOFEEBOOKING_TLS_DIRECTIVE__
     encode zstd gzip
     reverse_proxy localhost:3003
 }
 
-www.nofeebooking.com {
-__NOFEEBOOKING_TLS_DIRECTIVE__
+www.nofeebooking.com:443 {
+__NOFEEBOOKING_WWW_TLS_DIRECTIVE__
     redir https://nofeebooking.com{uri} permanent
 }
-__NOFEEBOOKING_BLOCK_END__
+__NOFEEBOOKING_STATIC_END__
 __NOFEEBOOKING_PROXY_START__
 http://nofeebooking.com {
     reverse_proxy __NOFEEBOOKING_SERVER_IP__:80

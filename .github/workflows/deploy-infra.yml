@@ -30,6 +30,8 @@ jobs:
       CADDY_TLS_KEY_PEM_B64: ${{ secrets.CADDY_TLS_KEY_PEM_B64 }}
       NOFEEBOOKING_TLS_CERT_PEM_B64: ${{ secrets.NOFEEBOOKING_TLS_CERT_PEM_B64 }}
       NOFEEBOOKING_TLS_KEY_PEM_B64: ${{ secrets.NOFEEBOOKING_TLS_KEY_PEM_B64 }}
+      NOFEEBOOKING_WWW_TLS_CERT_PEM_B64: ${{ secrets.NOFEEBOOKING_WWW_TLS_CERT_PEM_B64 }}
+      NOFEEBOOKING_WWW_TLS_KEY_PEM_B64: ${{ secrets.NOFEEBOOKING_WWW_TLS_KEY_PEM_B64 }}
 
     steps:
       - name: Checkout
@@ -54,13 +56,21 @@ jobs:
             scp scripts/deploy/deploy-infra.sh scripts/deploy/render-infra-caddyfile.sh \
               "deploy@${NODE_IP}:${APP_DIR}/scripts/deploy/"
 
-            # Sentry and storj-interface only on server_1; nofeebooking.com on all servers
+            # Sentry and storj-interface only on server_1; nofeebooking.com on all servers.
+            # server_1 is also the nofeebooking TLS source: it must stay on Caddy's
+            # automatic HTTPS (HTTP-01 only) so it keeps renewing via ACME; server_2/3
+            # receive that harvested cert as a static file and relay the ACME challenge
+            # path back to server_1, since DNS round-robins nofeebooking.com across all
+            # three and Let's Encrypt's multi-perspective validation means only the
+            # source host can ever answer the challenge itself.
             if [[ "${NODE_IP}" == "${SERVER_1_IP}" ]]; then
               SENTRY_ENABLED=true
               STORJ_ENABLED=true
+              NOFEEBOOKING_TLS_SOURCE_HOST=true
             else
               SENTRY_ENABLED=false
               STORJ_ENABLED=false
+              NOFEEBOOKING_TLS_SOURCE_HOST=false
             fi
             NOFEEBOOKING_ENABLED=true
 
@@ -71,8 +81,11 @@ jobs:
                export CADDY_TLS_KEY_PEM_B64='${CADDY_TLS_KEY_PEM_B64}'; \
                export NOFEEBOOKING_TLS_CERT_PEM_B64='${NOFEEBOOKING_TLS_CERT_PEM_B64}'; \
                export NOFEEBOOKING_TLS_KEY_PEM_B64='${NOFEEBOOKING_TLS_KEY_PEM_B64}'; \
+               export NOFEEBOOKING_WWW_TLS_CERT_PEM_B64='${NOFEEBOOKING_WWW_TLS_CERT_PEM_B64}'; \
+               export NOFEEBOOKING_WWW_TLS_KEY_PEM_B64='${NOFEEBOOKING_WWW_TLS_KEY_PEM_B64}'; \
                export SENTRY_ENABLED='${SENTRY_ENABLED}'; \
                export NOFEEBOOKING_ENABLED='${NOFEEBOOKING_ENABLED}'; \
+               export NOFEEBOOKING_TLS_SOURCE_HOST='${NOFEEBOOKING_TLS_SOURCE_HOST}'; \
                export NOFEEBOOKING_SERVER_IP='${SERVER_1_IP}'; \
                export NOFEEBOOKING_BACKEND_2='${SERVER_2_IP}'; \
                export NOFEEBOOKING_BACKEND_3='${SERVER_3_IP}'; \

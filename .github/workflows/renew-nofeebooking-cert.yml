@@ -28,23 +28,65 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H "${SERVER_1_IP}" >> ~/.ssh/known_hosts 2>/dev/null || true
 
-          # Force Caddy to renew the cert if it's within 30 days of expiry
-          ssh "deploy@${SERVER_1_IP}" \
-            "docker exec infra-caddy-1 caddy renew --force 2>/dev/null || true"
+          CERT_PATH="/data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/nofeebooking.com/nofeebooking.com.crt"
+          KEY_PATH="/data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/nofeebooking.com/nofeebooking.com.key"
+          WWW_CERT_PATH="/data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/www.nofeebooking.com/www.nofeebooking.com.crt"
+          WWW_KEY_PATH="/data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/www.nofeebooking.com/www.nofeebooking.com.key"
+
+          get_not_before() {
+            ssh "deploy@${SERVER_1_IP}" "docker exec infra-caddy-1 cat $1 2>/dev/null" \
+              | openssl x509 -noout -startdate 2>/dev/null | cut -d= -f2 || true
+          }
+
+          BEFORE="$(get_not_before "${CERT_PATH}")"
+          WWW_BEFORE="$(get_not_before "${WWW_CERT_PATH}")"
+          echo "nofeebooking.com notBefore prior to renewal attempt: ${BEFORE:-<none>}"
+          echo "www.nofeebooking.com notBefore prior to renewal attempt: ${WWW_BEFORE:-<none>}"
+
+          # Caddy manages nofeebooking.com and www.nofeebooking.com as two
+          # separate certs; `caddy renew --force` (no --domain) attempts both
+          # together. server_2/3 relay the ACME HTTP-01 challenge path back to
+          # server_1 (see infra/Caddyfile.template), so this should succeed on
+          # the first try now — but retry a few times as a safety margin.
+          RENEWED=false
+          WWW_RENEWED=false
+          for attempt in 1 2 3; do
+            echo "Renewal attempt ${attempt}/3"
+            ssh "deploy@${SERVER_1_IP}" "docker exec infra-caddy-1 caddy renew --force" || true
+
+            AFTER="$(get_not_before "${CERT_PATH}")"
+            WWW_AFTER="$(get_not_before "${WWW_CERT_PATH}")"
+            [[ -n "${AFTER}" && "${AFTER}" != "${BEFORE}" ]] && RENEWED=true
+            [[ -n "${WWW_AFTER}" && "${WWW_AFTER}" != "${WWW_BEFORE}" ]] && WWW_RENEWED=true
+
+            if [[ "${RENEWED}" == "true" && "${WWW_RENEWED}" == "true" ]]; then
+              echo "Both certs renewed: nofeebooking.com=${AFTER}, www.nofeebooking.com=${WWW_AFTER}"
+              break
+            fi
+            sleep 30
+          done
+
+          if [[ "${RENEWED}" != "true" ]]; then
+            echo "::error::nofeebooking.com cert was not renewed after 3 attempts. Leaving secrets untouched; investigate server_1's Caddy logs before the next scheduled run."
+            exit 1
+          fi
+          if [[ "${WWW_RENEWED}" != "true" ]]; then
+            echo "::warning::www.nofeebooking.com cert was not renewed after 3 attempts (may simply not be due yet). Leaving its secrets untouched this run."
+          fi
 
           # Extract cert and key from caddy_data volume
-          CERT_B64=$(ssh "deploy@${SERVER_1_IP}" \
-            "docker exec infra-caddy-1 cat \
-              /data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/nofeebooking.com/nofeebooking.com.crt \
-              | base64 | tr -d '\n'")
-
-          KEY_B64=$(ssh "deploy@${SERVER_1_IP}" \
-            "docker exec infra-caddy-1 cat \
-              /data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/nofeebooking.com/nofeebooking.com.key \
-              | base64 | tr -d '\n'")
-
+          CERT_B64=$(ssh "deploy@${SERVER_1_IP}" "docker exec infra-caddy-1 cat ${CERT_PATH} | base64 | tr -d '\n'")
+          KEY_B64=$(ssh "deploy@${SERVER_1_IP}" "docker exec infra-caddy-1 cat ${KEY_PATH} | base64 | tr -d '\n'")
           echo "CERT_B64=${CERT_B64}" >> "${GITHUB_ENV}"
           echo "KEY_B64=${KEY_B64}" >> "${GITHUB_ENV}"
+
+          if [[ "${WWW_RENEWED}" == "true" ]]; then
+            WWW_CERT_B64=$(ssh "deploy@${SERVER_1_IP}" "docker exec infra-caddy-1 cat ${WWW_CERT_PATH} | base64 | tr -d '\n'")
+            WWW_KEY_B64=$(ssh "deploy@${SERVER_1_IP}" "docker exec infra-caddy-1 cat ${WWW_KEY_PATH} | base64 | tr -d '\n'")
+            echo "WWW_CERT_B64=${WWW_CERT_B64}" >> "${GITHUB_ENV}"
+            echo "WWW_KEY_B64=${WWW_KEY_B64}" >> "${GITHUB_ENV}"
+            echo "WWW_RENEWED=true" >> "${GITHUB_ENV}"
+          fi
 
       - name: Update GitHub secrets
         env:
@@ -58,6 +100,16 @@ jobs:
           gh secret set NOFEEBOOKING_TLS_KEY_PEM_B64 \
             --body "${KEY_B64}" \
             --repo "${REPO}"
+
+          if [[ "${WWW_RENEWED:-false}" == "true" ]]; then
+            gh secret set NOFEEBOOKING_WWW_TLS_CERT_PEM_B64 \
+              --body "${WWW_CERT_B64}" \
+              --repo "${REPO}"
+
+            gh secret set NOFEEBOOKING_WWW_TLS_KEY_PEM_B64 \
+              --body "${WWW_KEY_B64}" \
+              --repo "${REPO}"
+          fi
 
           echo "Secrets updated — triggering infra deploy to distribute new cert"
 
