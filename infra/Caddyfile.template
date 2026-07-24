@@ -16,6 +16,12 @@ __TLS_DIRECTIVE__
     reverse_proxy localhost:3002
 }
 
+moderation.prakash.yral.com {
+__TLS_DIRECTIVE__
+    encode zstd gzip
+    reverse_proxy localhost:3006
+}
+
 __STORJ_BLOCK_START__
 storj-interface.yral.com {
 __TLS_DIRECTIVE__
